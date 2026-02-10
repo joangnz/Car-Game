@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -11,11 +12,14 @@ public class PlayerInputSystem : MonoBehaviour
     private InputAction accelerateAction, decelerateAction, steerAction, lookAction, switchCamAction;
 
     // Action Inputs
-    private float accelerateInput, decelerateInput;
+    private bool accelerateInput, decelerateInput;
     private Vector2 steerInput = Vector2.zero, lookInput = Vector2.zero;
 
     // Serialized Parameters
-    [SerializeField] private float moveSpeed = 5f;
+    [SerializeField] private float curSpeed = 0f;
+    [SerializeField] private float maxSpeed = 20f;
+    [SerializeField] private float maxNegSpeed = -5f;
+    [SerializeField] private float airResistance = 0.95f;
     [SerializeField] private float controllerSensitivity = 5f;
     [SerializeField] private float sensitivityMultiplier = 5f;
     [SerializeField] private float maxSteerYaw = 50f;
@@ -98,6 +102,8 @@ public class PlayerInputSystem : MonoBehaviour
     private void HandleRotation()
     {
         float yaw = steerInput.x * maxSteerYaw;
+        // yaw multiplicarse por 0 si no hay velocidad, multiplicarse por 0.7 a velocidad maxima
+
 
         Vector3 v = new(0, yaw, 0);
         Quaternion deltaRotation = Quaternion.Euler(v*Time.fixedDeltaTime);
@@ -110,11 +116,18 @@ public class PlayerInputSystem : MonoBehaviour
         forward.y = 0f;
         forward.Normalize();
 
-        float acceleration = accelerateInput - decelerateInput;
+        // Calculate accelerate or decelerate (resets to 0 if both or neither are pressed)
+        float acceleration = (accelerateInput ? 1f : 0f) - (decelerateInput ? 1f : 0f);
 
-        Vector3 moveDir = forward*acceleration;
+        // Air resistance --> slightly decrease acceleration and speed over time
+        if (acceleration != 0)
+        {
+            acceleration *= airResistance;
+            curSpeed += acceleration*Time.fixedDeltaTime;
+        }
+        else curSpeed *= airResistance;
 
-        rb.MovePosition(rb.position + Time.fixedDeltaTime*moveSpeed*moveDir);
+        rb.MovePosition(rb.position + curSpeed*forward);
     }
 
     private void HandleCamera()
@@ -154,11 +167,11 @@ public class PlayerInputSystem : MonoBehaviour
     {
         if (ctx.performed)
         {
-            accelerateInput = ctx.ReadValue<float>();
+            accelerateInput = true;
         }
         else if (ctx.canceled)
         {
-            accelerateInput = 0f;
+            accelerateInput = false;
         }
     }
 
@@ -166,11 +179,11 @@ public class PlayerInputSystem : MonoBehaviour
     {
         if (ctx.performed)
         {
-            decelerateInput = ctx.ReadValue<float>();
+            decelerateInput = true;
         }
         else if (ctx.canceled)
         {
-            decelerateInput = 0f;
+            decelerateInput = false;
         }
     }
 
