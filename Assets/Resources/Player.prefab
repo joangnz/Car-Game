@@ -89,7 +89,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 30ab2495cf3b2ec439c69823eb303ead, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  moveSpeed: 5
+  curSpeed: 0
+  maxSpeed: 90
+  maxNegSpeed: -20
+  airResistance: 0.995
   controllerSensitivity: 5
   sensitivityMultiplier: 5
   maxSteerYaw: 50

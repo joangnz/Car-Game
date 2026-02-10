@@ -17,9 +17,9 @@ public class PlayerInputSystem : MonoBehaviour
 
     // Serialized Parameters
     [SerializeField] private float curSpeed = 0f;
-    [SerializeField] private float maxSpeed = 20f;
-    [SerializeField] private float maxNegSpeed = -5f;
-    [SerializeField] private float airResistance = 0.95f;
+    [SerializeField] private float maxSpeed = 90;
+    [SerializeField] private float maxNegSpeed = -20f;
+    [SerializeField] private float airResistance = 0.995f;
     [SerializeField] private float controllerSensitivity = 5f;
     [SerializeField] private float sensitivityMultiplier = 5f;
     [SerializeField] private float maxSteerYaw = 50f;
@@ -101,9 +101,21 @@ public class PlayerInputSystem : MonoBehaviour
 
     private void HandleRotation()
     {
-        float yaw = steerInput.x * maxSteerYaw;
-        // yaw multiplicarse por 0 si no hay velocidad, multiplicarse por 0.7 a velocidad maxima
+        // When speed = 0, dont turn
+        float speed = Math.Abs(curSpeed);
+        if (speed == 0)
+            return;
 
+        // Currently, yaw only takes the input and steers
+        float yaw = steerInput.x * maxSteerYaw;
+
+        // If speed is really low, steer less. If speed is higher, steer more.
+        if (speed < .45f) yaw *= speed;
+        // However, at higher speeds, steer less
+        else yaw *= 1.3f - speed;
+
+        // invert steering when reversing
+        if (curSpeed < 0) yaw *= -1;
 
         Vector3 v = new(0, yaw, 0);
         Quaternion deltaRotation = Quaternion.Euler(v*Time.fixedDeltaTime);
@@ -117,15 +129,17 @@ public class PlayerInputSystem : MonoBehaviour
         forward.Normalize();
 
         // Calculate accelerate or decelerate (resets to 0 if both or neither are pressed)
-        float acceleration = (accelerateInput ? 1f : 0f) - (decelerateInput ? 1f : 0f);
+        float acceleration = ((accelerateInput ? 1f : 0f) - (decelerateInput ? 1f : 0f)) * Time.fixedDeltaTime;
+
+        if (curSpeed < .45f) curSpeed += acceleration;
+        else curSpeed += acceleration/2;
 
         // Air resistance --> slightly decrease acceleration and speed over time
-        if (acceleration != 0)
-        {
-            acceleration *= airResistance;
-            curSpeed += acceleration*Time.fixedDeltaTime;
-        }
-        else curSpeed *= airResistance;
+        curSpeed *= airResistance;
+        curSpeed = Mathf.Clamp(curSpeed, maxNegSpeed/100, maxSpeed/100);
+
+        // Prevent speeds of >0.01 
+        if (Math.Abs(curSpeed) < 0.01f) curSpeed = 0f;
 
         rb.MovePosition(rb.position + curSpeed*forward);
     }
