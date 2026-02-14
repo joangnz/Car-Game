@@ -4,9 +4,11 @@ using UnityEngine.InputSystem;
 
 public class PlayerInputSystem : MonoBehaviour
 {
-    private Rigidbody rb;
+    // Components and Children
     private Transform car, camPivot;
+    private Rigidbody rb;
     private Camera cam;
+    [SerializeField] private Transform FLWheel, FRWheel, RLWheel, RRWheel;
 
     // Actions
     private InputAction accelerateAction, decelerateAction, steerAction, lookAction, switchCamAction;
@@ -22,7 +24,7 @@ public class PlayerInputSystem : MonoBehaviour
     [SerializeField] private float airResistance = 0.995f;
     [SerializeField] private float controllerSensitivity = 5f;
     [SerializeField] private float sensitivityMultiplier = 5f;
-    [SerializeField] private float maxSteerYaw = 50f;
+    [SerializeField] private float maxSteerYaw = 80f;
     [SerializeField] private float maxWheelYaw = 30f;
 
     // Camera Parameters
@@ -90,13 +92,17 @@ public class PlayerInputSystem : MonoBehaviour
 
     private void Update()
     {
-        HandleCamera();
     }
 
     void FixedUpdate()
     {
         HandleRotation();
         HandleMovement();
+    }
+
+    private void LateUpdate()
+    {
+        HandleCamera();
     }
 
     private void HandleRotation()
@@ -146,12 +152,12 @@ public class PlayerInputSystem : MonoBehaviour
 
     private void HandleCamera()
     {
-        float sensitivity = controllerSensitivity * Time.deltaTime*sensitivityMultiplier;
+        float sensitivity = controllerSensitivity*Time.deltaTime*sensitivityMultiplier;
 
         if (lookInput != Vector2.zero)
         {
             // Input between -1 and 1 --> it's literally a percentage of maxCamYaw/Pitch
-            targetYaw = lookInput.x * maxCamYaw;
+            targetYaw = lookInput.x * maxCamYaw + (switchCam ? 180f : 0);
             targetPitch = defaultPitch + lookInput.y * maxCamPitch;
 
             targetPitch = Mathf.Clamp(targetPitch, minCamPitch, maxCamPitch);
@@ -159,8 +165,33 @@ public class PlayerInputSystem : MonoBehaviour
         else
         {
             // Smoothly return to default
-            targetYaw = Mathf.Lerp(targetYaw, defaultYaw, sensitivity);
+            targetYaw = Mathf.Lerp(targetYaw, defaultYaw + (switchCam ? 180f : 0), sensitivity);
             targetPitch = Mathf.Lerp(targetPitch, defaultPitch, sensitivity);
+
+            if (Mathf.Abs(targetYaw) < 0.01f) targetYaw = 0f;
+            if (Mathf.Abs(targetPitch) < 0.01f) targetPitch = 0f;
+        }
+
+        if (switchCam)
+        {
+            if (!camSwitched)
+            {
+                camSwitched = true;
+
+                camPivot.localRotation = Quaternion.Euler(
+                    camPivot.localRotation.eulerAngles.x,
+                    camPivot.localRotation.eulerAngles.y + 180f,
+                    0);
+            }
+        }
+        else if (camSwitched)
+        {
+            camSwitched = false;
+
+            camPivot.localRotation = Quaternion.Euler(
+                camPivot.localRotation.eulerAngles.x,
+                camPivot.localRotation.eulerAngles.y - 180f,
+                0);
         }
 
         Quaternion targetRotation = Quaternion.Euler(targetPitch, targetYaw, 0f);
@@ -171,6 +202,7 @@ public class PlayerInputSystem : MonoBehaviour
             sensitivity
             );
 
+        // 0 Z rotation
         camPivot.localRotation = Quaternion.Euler(
             camPivot.localRotation.eulerAngles.x,
             camPivot.localRotation.eulerAngles.y,
@@ -230,10 +262,12 @@ public class PlayerInputSystem : MonoBehaviour
         if (ctx.started || ctx.performed)
         {
             switchCam = true;
+            targetYaw += 180f;
         }
         else if (ctx.canceled)
         {
             switchCam = false;
+            targetYaw -= 180f;
         }
     }
 }
