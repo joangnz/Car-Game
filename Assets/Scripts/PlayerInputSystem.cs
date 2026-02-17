@@ -120,7 +120,7 @@ public class PlayerInputSystem : MonoBehaviour
     {
         if (grounded) HandleRotation();
         else HandleAirRotation();
-        HandleMovement();
+        HandleAcceleration();
 
         HandleJump();
     }
@@ -164,7 +164,7 @@ public class PlayerInputSystem : MonoBehaviour
         rb.MoveRotation(rb.rotation * deltaRotation);
     }
 
-    private void HandleMovement()
+    private void HandleAcceleration()
     {
         Vector3 forward = car.forward;
         forward.y = 0f;
