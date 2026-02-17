@@ -32,6 +32,9 @@ public class PlayerInputSystem : MonoBehaviour
     [SerializeField] private float maxSteerYaw = 80f;
     [SerializeField] private float maxWheelYaw = 30f;
     [SerializeField] private float groundedDistance = 0.5f;
+
+    [SerializeField] private float troubledUpDistance = 1.5f;
+    [SerializeField] private float troubledSideDistance = 1.2f;
     [SerializeField] private float jumpForce = 10000f;
 
     // Camera Parameters
@@ -42,6 +45,9 @@ public class PlayerInputSystem : MonoBehaviour
     private readonly float defaultPitch = 20f;
     private float targetYaw = 0f, targetPitch = 0f;
     private bool switchCam = false, camSwitched = false;
+
+    // Defaults
+    private readonly Vector3 defaultRotation = Vector3.zero;
 
     private void Awake()
     {
@@ -166,7 +172,6 @@ public class PlayerInputSystem : MonoBehaviour
 
         // Calculate accelerate or decelerate (resets to 0 if both or neither are pressed) if the car is grounded
         float acceleration = grounded ? ((accelerateInput ? 1f : 0f) - (decelerateInput ? 1f : 0f)) * Time.fixedDeltaTime : 0;
-        Debug.Log(acceleration == 0);
 
         if (curSpeed < .45f) curSpeed += acceleration;
         else curSpeed += acceleration/2;
@@ -195,9 +200,11 @@ public class PlayerInputSystem : MonoBehaviour
             {
                 Debug.Log("JUMOPING");
                 rb.AddForce(up * jumpForce, ForceMode.Impulse);
-            } else if (GetTroubled())
+            } else if (troubled)
             {
                 // reset rotation
+                //rb.MoveRotation(Quaternion.Euler(defaultRotation));
+                //rb.MovePosition(rb.position + up * 2f);
             } else if (false)
             {
                 // double jump logic
@@ -293,14 +300,16 @@ public class PlayerInputSystem : MonoBehaviour
     {
         bool troubled = false;
 
-        Debug.DrawRay(car.position, car.up * 0.1f);
-        Debug.DrawRay(car.position, car.right * 0.1f);
-        Debug.DrawRay(car.position, -car.right * 0.1f);
+        Debug.DrawRay(car.position, car.up * troubledUpDistance, Color.blue);
+        Debug.DrawRay(car.position, car.right * troubledSideDistance, Color.blue);
+        Debug.DrawRay(car.position, -car.right * troubledSideDistance, Color.blue);
 
-        if (Physics.Raycast(car.position, car.up, 0.1f) ||
-            Physics.Raycast(car.position, car.right, 0.1f) ||
-            Physics.Raycast(car.position, -car.right, 0.1f))
+        if (Physics.Raycast(car.position, car.up, troubledUpDistance) ||
+            Physics.Raycast(car.position, car.right, troubledSideDistance) ||
+            Physics.Raycast(car.position, -car.right, troubledSideDistance))
             troubled = true;
+
+        if (troubled) Debug.Log("TROUBLED");
         return troubled;
     }
 
