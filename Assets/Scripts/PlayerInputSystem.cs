@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -11,21 +12,27 @@ public class PlayerInputSystem : MonoBehaviour
     [SerializeField] private Transform FLWheel, FRWheel, RLWheel, RRWheel;
 
     // Actions
-    private InputAction accelerateAction, decelerateAction, steerAction, lookAction, switchCamAction;
+    private InputAction accelerateAction, decelerateAction, steerAction, jumpAction, lookAction, switchCamAction;
 
     // Action Inputs
-    private bool accelerateInput, decelerateInput;
+    private bool accelerateInput, decelerateInput, jumpInput;
     private Vector2 steerInput = Vector2.zero, lookInput = Vector2.zero;
+
+    // Attributes
+    private bool grounded, troubled;
 
     // Serialized Parameters
     [SerializeField] private float curSpeed = 0f;
     [SerializeField] private float maxSpeed = 90;
     [SerializeField] private float maxNegSpeed = -20f;
+    [SerializeField] private float minAbsSpeed = 0.15f;
     [SerializeField] private float airResistance = 0.995f;
     [SerializeField] private float controllerSensitivity = 5f;
     [SerializeField] private float sensitivityMultiplier = 5f;
     [SerializeField] private float maxSteerYaw = 80f;
     [SerializeField] private float maxWheelYaw = 30f;
+    [SerializeField] private float groundedDistance = 0.5f;
+    [SerializeField] private float jumpForce = 10000f;
 
     // Camera Parameters
     private readonly float maxCamYaw = 70f;
@@ -63,6 +70,10 @@ public class PlayerInputSystem : MonoBehaviour
         steerAction.performed += OnSteer;
         steerAction.canceled += OnSteer;
 
+        jumpAction = InputSystem.actions.FindAction("Jump");
+        jumpAction.performed += OnJump;
+        jumpAction.canceled += OnJump;
+
         lookAction = InputSystem.actions.FindAction("Look");
         lookAction.performed += OnLook;
         lookAction.canceled += OnLook;
@@ -77,6 +88,7 @@ public class PlayerInputSystem : MonoBehaviour
         accelerateAction.Enable();
         decelerateAction.Enable();
         steerAction.Enable();
+        jumpAction.Enable();
         lookAction.Enable();
         switchCamAction.Enable();
     }
@@ -86,18 +98,25 @@ public class PlayerInputSystem : MonoBehaviour
         accelerateAction.Disable();
         decelerateAction.Disable();
         steerAction.Disable();
+        jumpAction.Disable();
         lookAction.Disable();
         switchCamAction.Disable();
     }
 
     private void Update()
     {
+        // determine state
+        grounded = GetGrounded();
+        if (!grounded) troubled = GetTroubled();
     }
 
     void FixedUpdate()
     {
-        HandleRotation();
+        if (grounded) HandleRotation();
+        else HandleAirRotation();
         HandleMovement();
+
+        HandleJump();
     }
 
     private void LateUpdate()
@@ -105,6 +124,7 @@ public class PlayerInputSystem : MonoBehaviour
         HandleCamera();
     }
 
+    // Physics Handlers
     private void HandleRotation()
     {
         // When speed = 0, dont turn
@@ -128,14 +148,25 @@ public class PlayerInputSystem : MonoBehaviour
         rb.MoveRotation(rb.rotation * deltaRotation);
     }
 
+    private void HandleAirRotation()
+    {
+        float yaw = steerInput.x * maxSteerYaw;
+        float pitch = steerInput.y * maxSteerYaw;
+
+        Vector3 v = new(pitch, yaw, 0);
+        Quaternion deltaRotation = Quaternion.Euler(v*Time.fixedDeltaTime);
+        rb.MoveRotation(rb.rotation * deltaRotation);
+    }
+
     private void HandleMovement()
     {
         Vector3 forward = car.forward;
         forward.y = 0f;
         forward.Normalize();
 
-        // Calculate accelerate or decelerate (resets to 0 if both or neither are pressed)
-        float acceleration = ((accelerateInput ? 1f : 0f) - (decelerateInput ? 1f : 0f)) * Time.fixedDeltaTime;
+        // Calculate accelerate or decelerate (resets to 0 if both or neither are pressed) if the car is grounded
+        float acceleration = grounded ? ((accelerateInput ? 1f : 0f) - (decelerateInput ? 1f : 0f)) * Time.fixedDeltaTime : 0;
+        Debug.Log(acceleration == 0);
 
         if (curSpeed < .45f) curSpeed += acceleration;
         else curSpeed += acceleration/2;
@@ -144,10 +175,34 @@ public class PlayerInputSystem : MonoBehaviour
         curSpeed *= airResistance;
         curSpeed = Mathf.Clamp(curSpeed, maxNegSpeed/100, maxSpeed/100);
 
-        // Prevent speeds of >0.01 
-        if (Math.Abs(curSpeed) < 0.01f) curSpeed = 0f;
+        // Prevent speeds of <0.5 if not acceleration
+        if (Math.Abs(curSpeed) < minAbsSpeed && Mathf.Abs(acceleration) == 0) curSpeed = 0f;
 
         rb.MovePosition(rb.position + curSpeed*forward);
+    }
+
+    private void HandleJump()
+    {
+        Vector3 forward = car.forward;
+        Vector3 up = car.up;
+        up.Normalize();
+        forward.Normalize();
+
+        if (jumpInput)
+        {
+            // if grounded jump
+            if (grounded)
+            {
+                Debug.Log("JUMOPING");
+                rb.AddForce(up * jumpForce, ForceMode.Impulse);
+            } else if (GetTroubled())
+            {
+                // reset rotation
+            } else if (false)
+            {
+                // double jump logic
+            }
+        }
     }
 
     private void HandleCamera()
@@ -160,7 +215,7 @@ public class PlayerInputSystem : MonoBehaviour
             targetYaw = lookInput.x * maxCamYaw + (switchCam ? 180f : 0);
             targetPitch = defaultPitch + lookInput.y * maxCamPitch;
 
-            targetPitch = Mathf.Clamp(targetPitch, minCamPitch, maxCamPitch);
+            targetPitch = Mathf.Clamp(targetPitch, minCamPitch, maxCamPitch + defaultPitch);
         }
         else
         {
@@ -209,6 +264,47 @@ public class PlayerInputSystem : MonoBehaviour
             0f);
     }
 
+    // Methods
+    private bool GetGrounded()
+    {
+        bool fr, fl, rr, rl, gr = false;
+
+        fr = Physics.Raycast(FRWheel.position, -FRWheel.up, groundedDistance);
+        fl = Physics.Raycast(FLWheel.position, -FRWheel.up, groundedDistance);
+        rr = Physics.Raycast(RRWheel.position, -RRWheel.up, groundedDistance);
+        rl = Physics.Raycast(RLWheel.position, -RLWheel.up, groundedDistance);
+
+        Debug.DrawRay(FRWheel.position, -FRWheel.up * groundedDistance, Color.red);
+        Debug.DrawRay(FLWheel.position, -FLWheel.up * groundedDistance, Color.red);
+        Debug.DrawRay(RRWheel.position, -RRWheel.up * groundedDistance, Color.red);
+        Debug.DrawRay(RLWheel.position, -RLWheel.up * groundedDistance, Color.red);
+
+        if (fr && fl && rr && rl)
+        {
+            gr = true;
+            // Maybe reset forces and rotation?
+            car.position.Normalize();
+        }
+
+        return gr;
+    }
+
+    private bool GetTroubled()
+    {
+        bool troubled = false;
+
+        Debug.DrawRay(car.position, car.up * 0.1f);
+        Debug.DrawRay(car.position, car.right * 0.1f);
+        Debug.DrawRay(car.position, -car.right * 0.1f);
+
+        if (Physics.Raycast(car.position, car.up, 0.1f) ||
+            Physics.Raycast(car.position, car.right, 0.1f) ||
+            Physics.Raycast(car.position, -car.right, 0.1f))
+            troubled = true;
+        return troubled;
+    }
+
+    // Action Handlers
     private void OnAccelerate(InputAction.CallbackContext ctx)
     {
         if (ctx.performed)
@@ -242,6 +338,18 @@ public class PlayerInputSystem : MonoBehaviour
         else if (ctx.canceled)
         {
             steerInput = Vector2.zero;
+        }
+    }
+
+    private void OnJump(InputAction.CallbackContext ctx)
+    {
+        if (ctx.performed)
+        {
+            jumpInput = true;
+        }
+        if (ctx.canceled)
+        {
+            jumpInput = false;
         }
     }
 

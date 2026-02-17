@@ -96,11 +96,14 @@ MonoBehaviour:
   curSpeed: 0
   maxSpeed: 90
   maxNegSpeed: -20
+  minAbsSpeed: 0.15
   airResistance: 0.995
   controllerSensitivity: 5
   sensitivityMultiplier: 5
   maxSteerYaw: 80
   maxWheelYaw: 30
+  groundedDistance: 0.5
+  jumpForce: 10000
 --- !u!1001 &5592817908665053456
 PrefabInstance:
   m_ObjectHideFlags: 0
