@@ -1,7 +1,27 @@
 using System;
-using System.Runtime.CompilerServices;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
+
+public enum TorqueState
+{
+    Front,
+    Rear,
+    Stopped
+}
+
+public class Wheel
+{
+    public Wheel(Transform t, WheelCollider c)
+    {
+        this.Transform = t;
+        this.Collider = c;
+    }
+
+    public Transform Transform { get; set; }
+    public WheelCollider Collider { get; set; }
+}
 
 public class PlayerInputSystem : MonoBehaviour
 {
@@ -10,6 +30,7 @@ public class PlayerInputSystem : MonoBehaviour
     private Rigidbody rb;
     private Camera cam;
     [SerializeField] private Transform FLWheel, FRWheel, RLWheel, RRWheel;
+    [SerializeField] private WheelCollider FLCol, FRCol, RLCol, RRCol;
 
     // Actions
     private InputAction accelerateAction, decelerateAction, steerAction, jumpAction, lookAction, switchCamAction;
@@ -20,8 +41,15 @@ public class PlayerInputSystem : MonoBehaviour
 
     // Attributes
     private bool grounded, troubled;
+    [SerializeField] private TorqueState torqueState = TorqueState.Front;
 
     // Serialized Parameters
+    [SerializeField] private float curTorque = 0f;
+    [SerializeField] private float maxTorque = 1500f;
+    [SerializeField] private float minTorque = -500f;
+    [SerializeField] private float brakeForce = 3000f;
+    [SerializeField] private float torqueThreshold = 30f;
+
     [SerializeField] private float curSpeed = 0f;
     [SerializeField] private float maxSpeed = 90;
     [SerializeField] private float maxNegSpeed = -20f;
@@ -29,10 +57,8 @@ public class PlayerInputSystem : MonoBehaviour
     [SerializeField] private float airResistance = 0.995f;
     [SerializeField] private float controllerSensitivity = 5f;
     [SerializeField] private float sensitivityMultiplier = 5f;
-    [SerializeField] private float maxSteerYaw = 80f;
-    [SerializeField] private float maxWheelYaw = 30f;
+    [SerializeField] private float maxSteerYaw = 30f;
     [SerializeField] private float groundedDistance = 0.5f;
-
     [SerializeField] private float troubledUpDistance = 1.5f;
     [SerializeField] private float troubledSideDistance = 1.2f;
     [SerializeField] private float jumpForce = 10000f;
@@ -49,6 +75,10 @@ public class PlayerInputSystem : MonoBehaviour
     // Defaults
     private readonly Vector3 defaultRotation = Vector3.zero;
 
+    private readonly List<Wheel> Wheels = new();
+    private readonly List<Wheel> FrontWheels = new();
+    private readonly List<Wheel> RearWheels = new();
+
     private void Awake()
     {
         car = transform.Find("Car");
@@ -60,6 +90,8 @@ public class PlayerInputSystem : MonoBehaviour
         cam.transform.parent = camPivot;
 
         ActionsInit();
+
+        WheelsInit();
     }
 
     private void ActionsInit()
@@ -89,6 +121,20 @@ public class PlayerInputSystem : MonoBehaviour
         switchCamAction.canceled += OnSwitchCam;
     }
 
+    private void WheelsInit()
+    {
+        Wheels.Add(new(FLWheel, FLCol));
+        Wheels.Add(new(FRWheel, FRCol));
+        Wheels.Add(new(RLWheel, RLCol));
+        Wheels.Add(new(RRWheel, RRCol));
+
+        FrontWheels.Add(new(FLWheel, FLCol));
+        FrontWheels.Add(new(FRWheel, FRCol));
+
+        RearWheels.Add(new(RLWheel, RLCol));
+        RearWheels.Add(new(RRWheel, RRCol));
+    }
+
     private void OnEnable()
     {
         accelerateAction.Enable();
@@ -112,6 +158,8 @@ public class PlayerInputSystem : MonoBehaviour
     private void Update()
     {
         // determine state
+        torqueState = GetTorqueState();
+
         grounded = GetGrounded();
         if (!grounded) troubled = GetTroubled();
     }
@@ -119,10 +167,11 @@ public class PlayerInputSystem : MonoBehaviour
     void FixedUpdate()
     {
         if (grounded) HandleRotation();
-        else HandleAirRotation();
+        else HandleAirRotation(troubled);
         HandleAcceleration();
 
         HandleJump();
+        UpdateWheels();
     }
 
     private void LateUpdate()
@@ -130,11 +179,25 @@ public class PlayerInputSystem : MonoBehaviour
         HandleCamera();
     }
 
+    private void UpdateWheels()
+    {
+        foreach (Wheel wheel in Wheels)
+        {
+            UpdateWheelPose(wheel.Transform, wheel.Collider);
+        }
+    }
+
+    private void UpdateWheelPose(Transform tr, WheelCollider col)
+    {
+        col.GetWorldPose(out Vector3 pos, out Quaternion rot);
+        tr.SetPositionAndRotation(pos, rot);
+    }
+
     // Physics Handlers
     private void HandleRotation()
     {
         // When speed = 0, dont turn
-        float speed = Math.Abs(curSpeed);
+        float speed = FrontWheels.Average(w => w.Collider.rotationSpeed);
         if (speed == 0)
             return;
 
@@ -142,22 +205,26 @@ public class PlayerInputSystem : MonoBehaviour
         float yaw = steerInput.x * maxSteerYaw;
 
         // If speed is really low, steer less. If speed is higher, steer more.
-        if (speed < .45f) yaw *= speed;
+        if (speed < 70) yaw *= speed;
         // However, at higher speeds, steer less
         else yaw *= 1.3f - speed;
 
         // invert steering when reversing
-        if (curSpeed < 0) yaw *= -1;
+        if (speed < 0) yaw *= -1;
 
-        Vector3 v = new(0, yaw, 0);
-        Quaternion deltaRotation = Quaternion.Euler(v*Time.fixedDeltaTime);
-        rb.MoveRotation(rb.rotation * deltaRotation);
+        yaw = Mathf.Clamp(-yaw, -maxSteerYaw, maxSteerYaw);
+
+
+        foreach (Wheel wheel in FrontWheels)
+        {
+            wheel.Collider.steerAngle = Mathf.Lerp(wheel.Collider.steerAngle, yaw, .05f);
+        }
     }
 
-    private void HandleAirRotation()
+    private void HandleAirRotation(bool troubled = false)
     {
         float yaw = steerInput.x * maxSteerYaw;
-        float pitch = steerInput.y * maxSteerYaw;
+        float pitch = troubled ? 0 : steerInput.y * maxSteerYaw;
 
         Vector3 v = new(pitch, yaw, 0);
         Quaternion deltaRotation = Quaternion.Euler(v*Time.fixedDeltaTime);
@@ -166,24 +233,67 @@ public class PlayerInputSystem : MonoBehaviour
 
     private void HandleAcceleration()
     {
-        Vector3 forward = car.forward;
-        forward.y = 0f;
-        forward.Normalize();
+        switch (accelerateInput, decelerateInput)
+        {
+            case (true, false):
+                HandleFrontTorque();
+                //HandleAccelerate();
+                 HandleBrake(torqueState == TorqueState.Rear);
+                break;
+            case (false, true):
+                HandleRearTorque();
+                //HandleDecelerate();
+                 HandleBrake(torqueState == TorqueState.Front);
+                break;
+            default:
+                // lerp to 0?
+                HandleNeutralTorque();
+                HandleBrake(false);
+                break;
+        }
+    }
 
-        // Calculate accelerate or decelerate (resets to 0 if both or neither are pressed) if the car is grounded
-        float acceleration = grounded ? ((accelerateInput ? 1f : 0f) - (decelerateInput ? 1f : 0f)) * Time.fixedDeltaTime : 0;
+    private void HandleNeutralTorque()
+    {
+        foreach (Wheel wheel in RearWheels)
+        {
+            wheel.Collider.motorTorque = Mathf.Lerp(wheel.Collider.motorTorque, 0, .3f);
+            if (Math.Abs(wheel.Collider.motorTorque) <= .97) wheel.Collider.motorTorque = 0;
+        }
+    }
 
-        if (curSpeed < .45f) curSpeed += acceleration;
-        else curSpeed += acceleration/2;
+    private void HandleFrontTorque()
+    {
+        float desiredTorque = RearWheels.Average(w => w.Collider.rotationSpeed) >= -torqueThreshold ? maxTorque : 0;
+        foreach (Wheel wheel in RearWheels)
+        {
+            wheel.Collider.motorTorque = Mathf.Lerp(wheel.Collider.motorTorque, desiredTorque, .3f);
+            if (Math.Abs(wheel.Collider.motorTorque) >= Math.Abs(desiredTorque*.97)) wheel.Collider.motorTorque = desiredTorque;
+        }
+    }
 
-        // Air resistance --> slightly decrease acceleration and speed over time
-        curSpeed *= airResistance;
-        curSpeed = Mathf.Clamp(curSpeed, maxNegSpeed/100, maxSpeed/100);
+    private void HandleRearTorque()
+    {
+        float desiredTorque = RearWheels.Average(w => w.Collider.rotationSpeed) <= torqueThreshold ? minTorque : 0;
+        foreach (Wheel wheel in RearWheels)
+        {
+            wheel.Collider.motorTorque = Mathf.Lerp(wheel.Collider.motorTorque, desiredTorque, .3f);
+            if (Math.Abs(wheel.Collider.motorTorque) >= Math.Abs(desiredTorque*.97)) wheel.Collider.motorTorque = desiredTorque;
+        }
+    }
 
-        // Prevent speeds of <0.5 if not acceleration
-        if (Math.Abs(curSpeed) < minAbsSpeed && Mathf.Abs(acceleration) == 0) curSpeed = 0f;
+    private void HandleBrake(bool b)
+    {
+        if (b) Debug.Log("BRAKING NOW");
+        if (b) RLCol.brakeTorque = RRCol.brakeTorque = FLCol.brakeTorque = FRCol.brakeTorque = brakeForce;
+        else RLCol.brakeTorque = RRCol.brakeTorque = FLCol.brakeTorque = FRCol.brakeTorque = 0;
+    }
 
-        rb.MovePosition(rb.position + curSpeed*forward);
+    private void HandleDrift(bool b)
+    {
+        if (b) Debug.Log("DRIFTING NOW");
+        if (b) RLCol.brakeTorque = RRCol.brakeTorque = FLCol.brakeTorque = FRCol.brakeTorque = brakeForce;
+        else RLCol.brakeTorque = RRCol.brakeTorque = FLCol.brakeTorque = FRCol.brakeTorque = 0;
     }
 
     private void HandleJump()
@@ -200,12 +310,14 @@ public class PlayerInputSystem : MonoBehaviour
             {
                 Debug.Log("JUMOPING");
                 rb.AddForce(up * jumpForce, ForceMode.Impulse);
-            } else if (troubled)
+            }
+            else if (troubled)
             {
                 // reset rotation
                 //rb.MoveRotation(Quaternion.Euler(defaultRotation));
                 //rb.MovePosition(rb.position + up * 2f);
-            } else if (false)
+            }
+            else if (false)
             {
                 // double jump logic
             }
@@ -272,19 +384,29 @@ public class PlayerInputSystem : MonoBehaviour
     }
 
     // Methods
+    private TorqueState GetTorqueState()
+    {
+        RLCol.rotationSpeed = Mathf.Abs(RLCol.rotationSpeed) <= torqueThreshold ? 0 : RLCol.rotationSpeed;
+        RRCol.rotationSpeed = Mathf.Abs(RRCol.rotationSpeed) <= torqueThreshold ? 0 : RRCol.rotationSpeed;
+        Debug.Log("R" + RLCol.rotationSpeed);
+        if (RLCol.rotationSpeed < 0 && RRCol.rotationSpeed < 0) return TorqueState.Rear;
+        else if (RLCol.rotationSpeed == 0 && RRCol.rotationSpeed == 0) return TorqueState.Stopped;
+        else return TorqueState.Front;
+    }
+
     private bool GetGrounded()
     {
         bool fr, fl, rr, rl, gr = false;
 
-        fr = Physics.Raycast(FRWheel.position, -FRWheel.up, groundedDistance);
-        fl = Physics.Raycast(FLWheel.position, -FRWheel.up, groundedDistance);
-        rr = Physics.Raycast(RRWheel.position, -RRWheel.up, groundedDistance);
-        rl = Physics.Raycast(RLWheel.position, -RLWheel.up, groundedDistance);
+        fr = Physics.Raycast(FRWheel.position, -car.up, groundedDistance);
+        fl = Physics.Raycast(FLWheel.position, -car.up, groundedDistance);
+        rr = Physics.Raycast(RRWheel.position, -car.up, groundedDistance);
+        rl = Physics.Raycast(RLWheel.position, -car.up, groundedDistance);
 
-        Debug.DrawRay(FRWheel.position, -FRWheel.up * groundedDistance, Color.red);
-        Debug.DrawRay(FLWheel.position, -FLWheel.up * groundedDistance, Color.red);
-        Debug.DrawRay(RRWheel.position, -RRWheel.up * groundedDistance, Color.red);
-        Debug.DrawRay(RLWheel.position, -RLWheel.up * groundedDistance, Color.red);
+        Debug.DrawRay(FRWheel.position, -car.up * groundedDistance, Color.red);
+        Debug.DrawRay(FLWheel.position, -car.up * groundedDistance, Color.red);
+        Debug.DrawRay(RRWheel.position, -car.up * groundedDistance, Color.red);
+        Debug.DrawRay(RLWheel.position, -car.up * groundedDistance, Color.red);
 
         if (fr && fl && rr && rl)
         {

@@ -10,7 +10,7 @@ public class GameManager : MonoBehaviour
     void Start()
     {
         player = Instantiate(playerPrefab).GetComponent<Player>();
-        player.transform.position = new(5, 2, 5);
+        player.transform.position = new(30, 2, 30);
     }
 
     // Update is called once per frame
