@@ -97,19 +97,30 @@ MonoBehaviour:
   FRCol: {fileID: 5315002775921373118}
   RLCol: {fileID: 2371772589731301419}
   RRCol: {fileID: 423610067274751756}
-  curSpeed: 0
-  maxSpeed: 90
-  maxNegSpeed: -20
-  minAbsSpeed: 0.15
-  airResistance: 0.995
   controllerSensitivity: 5
   sensitivityMultiplier: 5
-  maxSteerYaw: 80
-  maxWheelYaw: 30
+  torqueState: 0
+  maxTorque: 500
+  minTorque: -500
+  brakeForce: 5000
+  torqueThreshold: 30
+  maxSteerYaw: 15
   groundedDistance: 0.5
+  curTorque: 0
+  curBrake: 0
   troubledUpDistance: 1.5
   troubledSideDistance: 1.2
   jumpForce: 10000
+  forwardStiffness: 1
+  forwardES: 0
+  forwardEV: 1.2
+  forwardAS: 0.5
+  forwardAV: 0.8
+  sideStiffness: 1
+  sideES: 0
+  sideEV: 1
+  sideAS: 1.2
+  sideAV: 1.2
 --- !u!1001 &5592817908665053456
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -118,10 +129,30 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1798994001516570481}
     m_Modifications:
+    - target: {fileID: 314971172518125230, guid: e9be6b9d71ce20345b55b654f6eca5d9, type: 3}
+      propertyPath: m_SuspensionSpring.spring
+      value: 10000
+      objectReference: {fileID: 0}
+    - target: {fileID: 314971172518125230, guid: e9be6b9d71ce20345b55b654f6eca5d9, type: 3}
+      propertyPath: m_SuspensionSpring.targetPosition
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 3374474453900846415, guid: e9be6b9d71ce20345b55b654f6eca5d9, type: 3}
+      propertyPath: m_Mass
+      value: 500
+      objectReference: {fileID: 0}
     - target: {fileID: 4920230348652631082, guid: e9be6b9d71ce20345b55b654f6eca5d9, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 07f44fe3e9c462146a7769b976c50ec4, type: 2}
+    - target: {fileID: 5223429399262309916, guid: e9be6b9d71ce20345b55b654f6eca5d9, type: 3}
+      propertyPath: m_SuspensionSpring.spring
+      value: 10000
+      objectReference: {fileID: 0}
+    - target: {fileID: 5223429399262309916, guid: e9be6b9d71ce20345b55b654f6eca5d9, type: 3}
+      propertyPath: m_SuspensionSpring.targetPosition
+      value: 0.05
+      objectReference: {fileID: 0}
     - target: {fileID: 6948587442945639655, guid: e9be6b9d71ce20345b55b654f6eca5d9, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -162,9 +193,25 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7161689254267407433, guid: e9be6b9d71ce20345b55b654f6eca5d9, type: 3}
+      propertyPath: m_SuspensionSpring.spring
+      value: 10000
+      objectReference: {fileID: 0}
+    - target: {fileID: 7161689254267407433, guid: e9be6b9d71ce20345b55b654f6eca5d9, type: 3}
+      propertyPath: m_SuspensionSpring.targetPosition
+      value: 0.05
+      objectReference: {fileID: 0}
     - target: {fileID: 7720726507797323357, guid: e9be6b9d71ce20345b55b654f6eca5d9, type: 3}
       propertyPath: m_Name
       value: Car
+      objectReference: {fileID: 0}
+    - target: {fileID: 7887936941379631419, guid: e9be6b9d71ce20345b55b654f6eca5d9, type: 3}
+      propertyPath: m_SuspensionSpring.spring
+      value: 10000
+      objectReference: {fileID: 0}
+    - target: {fileID: 7887936941379631419, guid: e9be6b9d71ce20345b55b654f6eca5d9, type: 3}
+      propertyPath: m_SuspensionSpring.targetPosition
+      value: 0.05
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
