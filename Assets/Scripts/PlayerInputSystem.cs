@@ -2,7 +2,6 @@ using Fusion;
 using Fusion.Addons.Physics;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public enum TorqueState
 {
@@ -93,17 +92,13 @@ public class PlayerInputSystem : NetworkBehaviour
     private readonly List<Wheel> FrontWheels = new();
     private readonly List<Wheel> RearWheels = new();
 
+    #region Initialization
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
         nrb = GetComponent<NetworkRigidbody3D>();
 
         camPivot = transform.Find("CamPivot");
-
-        //cam = FindFirstObjectByType<Camera>();
-        //cam.transform.parent = camPivot;
-
-        //ActionsInit();
 
         WheelsInit();
     }
@@ -117,33 +112,6 @@ public class PlayerInputSystem : NetworkBehaviour
             cam.transform.localPosition = camPos;
         }
     }
-
-    //private void ActionsInit()
-    //{
-    //    accelerateAction = InputSystem.actions.FindAction("Accelerate");
-    //    accelerateAction.performed += OnAccelerate;
-    //    accelerateAction.canceled += OnAccelerate;
-
-    //    decelerateAction = InputSystem.actions.FindAction("Decelerate");
-    //    decelerateAction.performed += OnDecelerate;
-    //    decelerateAction.canceled += OnDecelerate;
-
-    //    steerAction = InputSystem.actions.FindAction("Steer");
-    //    steerAction.performed += OnSteer;
-    //    steerAction.canceled += OnSteer;
-
-    //    jumpAction = InputSystem.actions.FindAction("Jump");
-    //    jumpAction.performed += OnJump;
-    //    jumpAction.canceled += OnJump;
-
-    //    lookAction = InputSystem.actions.FindAction("Look");
-    //    lookAction.performed += OnLook;
-    //    lookAction.canceled += OnLook;
-
-    //    switchCamAction = InputSystem.actions.FindAction("SwitchCam");
-    //    switchCamAction.performed += OnSwitchCam;
-    //    switchCamAction.canceled += OnSwitchCam;
-    //}
 
     private void WheelsInit()
     {
@@ -162,63 +130,25 @@ public class PlayerInputSystem : NetworkBehaviour
         {
             WheelFrictionCurve f = wheel.Collider.forwardFriction;
             f.stiffness = forwardStiffness;
-            f.extremumSlip = 0.15f;
-            f.extremumValue = 1.2f;
-            f.asymptoteSlip = 0.5f;
-            f.asymptoteValue= 0.8f;
-            f.stiffness     = 1.4f;
+            f.extremumSlip = forwardES;
+            f.extremumValue = forwardEV;
+            f.asymptoteSlip = forwardAS;
+            f.asymptoteValue = forwardAV;
+            f.stiffness = forwardStiffness;
             wheel.Collider.forwardFriction = f;
 
             WheelFrictionCurve s = wheel.Collider.sidewaysFriction;
             s.stiffness = sideStiffness;
-            s.extremumSlip  = 0.3f;
-            s.extremumValue = 1.1f;
-            s.asymptoteSlip = 0.6f;
-            s.asymptoteValue= 0.7f;
+            s.extremumSlip  = sideES;
+            s.extremumValue = sideEV;
+            s.asymptoteSlip = sideAS;
+            s.asymptoteValue= sideAV;
             wheel.Collider.sidewaysFriction = s;
         }
     }
+    #endregion
 
-    //private void OnEnable()
-    //{
-    //    accelerateAction.Enable();
-    //    decelerateAction.Enable();
-    //    steerAction.Enable();
-    //    jumpAction.Enable();
-    //    lookAction.Enable();
-    //    switchCamAction.Enable();
-    //}
-
-    //private void OnDisable()
-    //{
-    //    accelerateAction.Disable();
-    //    decelerateAction.Disable();
-    //    steerAction.Disable();
-    //    jumpAction.Disable();
-    //    lookAction.Disable();
-    //    switchCamAction.Disable();
-    //}
-
-    private void Update()
-    {
-        // determine state
-        //torqueState = GetTorqueState();
-
-        //grounded = GetGrounded();
-        //if (!grounded) troubled = GetTroubled();
-    }
-
-    void FixedUpdate()
-    {
-        //if (grounded) HandleRotation();
-        //else HandleAirRotation(troubled);
-
-        //HandleAcceleration();
-
-        //HandleJump();
-        //UpdateWheels();
-    }
-
+    #region Updates
     public override void FixedUpdateNetwork()
     {
         torqueState = GetTorqueState();
@@ -231,7 +161,7 @@ public class PlayerInputSystem : NetworkBehaviour
             if (switchCamInput != input.switchCamInput) targetYaw += switchCamInput ? 180 : -180;
             accelerateInput = input.accelerateInput;
             decelerateInput = input.decelerateInput;
-            steerInput = input.steerInput;  
+            steerInput = input.steerInput;
             jumpInput = input.jumpInput;
             lookInput = input.lookInput;
             switchCamInput = input.switchCamInput;
@@ -270,8 +200,9 @@ public class PlayerInputSystem : NetworkBehaviour
         col.GetWorldPose(out Vector3 pos, out Quaternion rot);
         tr.SetPositionAndRotation(pos, rot);
     }
+    #endregion
 
-    // Physics Handlers
+    #region Handlers
     private void HandleRotation()
     {
         // When speed = 0, dont turn
@@ -437,7 +368,9 @@ public class PlayerInputSystem : NetworkBehaviour
             camPivot.localRotation.eulerAngles.y,
             0f);
     }
+    #endregion
 
+    #region State Determinants
     // Methods
     private TorqueState GetTorqueState()
     {
@@ -486,79 +419,5 @@ public class PlayerInputSystem : NetworkBehaviour
 
         return troubled;
     }
-
-    // Action Handlers
-    //private void OnAccelerate(InputAction.CallbackContext ctx)
-    //{
-    //    if (ctx.performed)
-    //    {
-    //        accelerateInput = true;
-    //    }
-    //    else if (ctx.canceled)
-    //    {
-    //        accelerateInput = false;
-    //    }
-    //}
-
-    //private void OnDecelerate(InputAction.CallbackContext ctx)
-    //{
-    //    if (ctx.performed)
-    //    {
-    //        decelerateInput = true;
-    //    }
-    //    else if (ctx.canceled)
-    //    {
-    //        decelerateInput = false;
-    //    }
-    //}
-
-    //private void OnSteer(InputAction.CallbackContext ctx)
-    //{
-    //    if (ctx.performed)
-    //    {
-    //        steerInput = ctx.ReadValue<Vector2>();
-    //    }
-    //    else if (ctx.canceled)
-    //    {
-    //        steerInput = Vector2.zero;
-    //    }
-    //}
-
-    //private void OnJump(InputAction.CallbackContext ctx)
-    //{
-    //    if (ctx.performed)
-    //    {
-    //        jumpInput = true;
-    //    }
-    //    if (ctx.canceled)
-    //    {
-    //        jumpInput = false;
-    //    }
-    //}
-
-    //private void OnLook(InputAction.CallbackContext ctx)
-    //{
-    //    if (ctx.performed)
-    //    {
-    //        lookInput = ctx.ReadValue<Vector2>();
-    //    }
-    //    else if (ctx.canceled)
-    //    {
-    //        lookInput = Vector2.zero;
-    //    }
-    //}
-
-    //private void OnSwitchCam(InputAction.CallbackContext ctx)
-    //{
-    //    if (ctx.started || ctx.performed)
-    //    {
-    //        switchCamInput = true;
-    //        targetYaw += 180f;
-    //    }
-    //    else if (ctx.canceled)
-    //    {
-    //        switchCamInput = false;
-    //        targetYaw -= 180f;
-    //    }
-    //}
+    #endregion
 }
