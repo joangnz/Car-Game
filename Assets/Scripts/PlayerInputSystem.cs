@@ -1,3 +1,5 @@
+using Fusion;
+using Fusion.Addons.Physics;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -21,22 +23,23 @@ public class Wheel
     public WheelCollider Collider { get; set; }
 }
 
-public class PlayerInputSystem : MonoBehaviour
+public class PlayerInputSystem : NetworkBehaviour
 {
     // Components and Children
     [Header("Components and Children")]
-    private Transform car, camPivot;
+    private Transform camPivot;
     private Rigidbody rb;
+    private NetworkRigidbody3D nrb;
     private Camera cam;
     [SerializeField] private Transform FLWheel, FRWheel, RLWheel, RRWheel;
     [SerializeField] private WheelCollider FLCol, FRCol, RLCol, RRCol;
 
     // Actions
-    private InputAction accelerateAction, decelerateAction, steerAction, jumpAction, lookAction, switchCamAction;
+    //private InputAction accelerateAction, decelerateAction, steerAction, jumpAction, lookAction, switchCamAction;
 
     // Action Inputs
     [Header("Sensitivity")]
-    private bool accelerateInput, decelerateInput, jumpInput;
+    private bool accelerateInput, decelerateInput, jumpInput, switchCamInput = false;
     private Vector2 steerInput = Vector2.zero, lookInput = Vector2.zero;
     [SerializeField] private float controllerSensitivity = 5f;
     [SerializeField] private float sensitivityMultiplier = 5f;
@@ -65,13 +68,14 @@ public class PlayerInputSystem : MonoBehaviour
     [SerializeField] private float jumpForce = 10000f;
 
     // Camera Parameters
+    private readonly Vector3 camPos = new(0, 1, -10);
     private readonly float maxCamYaw = 70f;
     private readonly float maxCamPitch = 30f;
     private readonly float minCamPitch = -10f;
     private readonly float defaultYaw = 0f;
     private readonly float defaultPitch = 20f;
-    private float targetYaw = 0f, targetPitch = 0f;
-    private bool switchCam = false, camSwitched = false;
+    public float targetYaw = 0f, targetPitch = 0f;
+    private bool camSwitched = false;
 
     // Wheels
     [Header("Wheels")]
@@ -91,46 +95,55 @@ public class PlayerInputSystem : MonoBehaviour
 
     private void Awake()
     {
-        car = transform.Find("Car");
-        rb = car.GetComponent<Rigidbody>();
-        rb.centerOfMass = new Vector3(0, -0.5f, 0);
+        rb = GetComponent<Rigidbody>();
+        nrb = GetComponent<NetworkRigidbody3D>();
 
-        camPivot = car.Find("CamPivot");
+        camPivot = transform.Find("CamPivot");
 
-        cam = Camera.main;
-        cam.transform.parent = camPivot;
+        //cam = FindFirstObjectByType<Camera>();
+        //cam.transform.parent = camPivot;
 
-        ActionsInit();
+        //ActionsInit();
 
         WheelsInit();
     }
 
-    private void ActionsInit()
+    public override void Spawned()
     {
-        accelerateAction = InputSystem.actions.FindAction("Accelerate");
-        accelerateAction.performed += OnAccelerate;
-        accelerateAction.canceled += OnAccelerate;
-
-        decelerateAction = InputSystem.actions.FindAction("Decelerate");
-        decelerateAction.performed += OnDecelerate;
-        decelerateAction.canceled += OnDecelerate;
-
-        steerAction = InputSystem.actions.FindAction("Steer");
-        steerAction.performed += OnSteer;
-        steerAction.canceled += OnSteer;
-
-        jumpAction = InputSystem.actions.FindAction("Jump");
-        jumpAction.performed += OnJump;
-        jumpAction.canceled += OnJump;
-
-        lookAction = InputSystem.actions.FindAction("Look");
-        lookAction.performed += OnLook;
-        lookAction.canceled += OnLook;
-
-        switchCamAction = InputSystem.actions.FindAction("SwitchCam");
-        switchCamAction.performed += OnSwitchCam;
-        switchCamAction.canceled += OnSwitchCam;
+        if (Object.HasInputAuthority)
+        {
+            cam = FindFirstObjectByType<Camera>();
+            cam.transform.parent = camPivot;
+            cam.transform.localPosition = camPos;
+        }
     }
+
+    //private void ActionsInit()
+    //{
+    //    accelerateAction = InputSystem.actions.FindAction("Accelerate");
+    //    accelerateAction.performed += OnAccelerate;
+    //    accelerateAction.canceled += OnAccelerate;
+
+    //    decelerateAction = InputSystem.actions.FindAction("Decelerate");
+    //    decelerateAction.performed += OnDecelerate;
+    //    decelerateAction.canceled += OnDecelerate;
+
+    //    steerAction = InputSystem.actions.FindAction("Steer");
+    //    steerAction.performed += OnSteer;
+    //    steerAction.canceled += OnSteer;
+
+    //    jumpAction = InputSystem.actions.FindAction("Jump");
+    //    jumpAction.performed += OnJump;
+    //    jumpAction.canceled += OnJump;
+
+    //    lookAction = InputSystem.actions.FindAction("Look");
+    //    lookAction.performed += OnLook;
+    //    lookAction.canceled += OnLook;
+
+    //    switchCamAction = InputSystem.actions.FindAction("SwitchCam");
+    //    switchCamAction.performed += OnSwitchCam;
+    //    switchCamAction.canceled += OnSwitchCam;
+    //}
 
     private void WheelsInit()
     {
@@ -166,57 +179,70 @@ public class PlayerInputSystem : MonoBehaviour
         }
     }
 
-    private void OnEnable()
-    {
-        accelerateAction.Enable();
-        decelerateAction.Enable();
-        steerAction.Enable();
-        jumpAction.Enable();
-        lookAction.Enable();
-        switchCamAction.Enable();
-    }
+    //private void OnEnable()
+    //{
+    //    accelerateAction.Enable();
+    //    decelerateAction.Enable();
+    //    steerAction.Enable();
+    //    jumpAction.Enable();
+    //    lookAction.Enable();
+    //    switchCamAction.Enable();
+    //}
 
-    private void OnDisable()
-    {
-        accelerateAction.Disable();
-        decelerateAction.Disable();
-        steerAction.Disable();
-        jumpAction.Disable();
-        lookAction.Disable();
-        switchCamAction.Disable();
-    }
+    //private void OnDisable()
+    //{
+    //    accelerateAction.Disable();
+    //    decelerateAction.Disable();
+    //    steerAction.Disable();
+    //    jumpAction.Disable();
+    //    lookAction.Disable();
+    //    switchCamAction.Disable();
+    //}
 
     private void Update()
     {
         // determine state
+        //torqueState = GetTorqueState();
+
+        //grounded = GetGrounded();
+        //if (!grounded) troubled = GetTroubled();
+    }
+
+    void FixedUpdate()
+    {
+        //if (grounded) HandleRotation();
+        //else HandleAirRotation(troubled);
+
+        //HandleAcceleration();
+
+        //HandleJump();
+        //UpdateWheels();
+    }
+
+    public override void FixedUpdateNetwork()
+    {
         torqueState = GetTorqueState();
 
         grounded = GetGrounded();
         if (!grounded) troubled = GetTroubled();
 
-        foreach (Wheel wheel in Wheels)
+        if (GetInput(out NetworkInputData input))
         {
-            WheelFrictionCurve f = wheel.Collider.forwardFriction;
-            f.stiffness = forwardStiffness;
-            f.extremumSlip = forwardES; // 0.15f;
-            f.extremumValue = forwardEV; // 1.2f;
-            f.asymptoteSlip = forwardAS; // 0.5f;
-            f.asymptoteValue = forwardAV; // 0.8f;
-            f.stiffness = forwardStiffness; // 1.4f;
-            wheel.Collider.forwardFriction = f;
-
-            WheelFrictionCurve s = wheel.Collider.sidewaysFriction;
-            s.stiffness = sideStiffness;
-            s.extremumSlip = sideES; // 0.3f;
-            s.extremumValue = sideEV; // 1.1f;
-            s.asymptoteSlip = sideAS; // 0.6f;
-            s.asymptoteValue = sideAV; // 0.7f;
-            wheel.Collider.sidewaysFriction = s;
+            if (switchCamInput != input.switchCamInput) targetYaw += switchCamInput ? 180 : -180;
+            accelerateInput = input.accelerateInput;
+            decelerateInput = input.decelerateInput;
+            steerInput = input.steerInput;  
+            jumpInput = input.jumpInput;
+            lookInput = input.lookInput;
+            switchCamInput = input.switchCamInput;
+            Debug.Log("Accelerate: " + accelerateInput);
+            Debug.Log("Decelerate: " + decelerateInput);
+            Debug.Log("Steer: " +  steerInput);
+            Debug.Log("Jump: " + jumpInput);
+            Debug.Log("Look: " + lookInput);
+            Debug.Log("Switch Cam: " +  switchCamInput);
         }
-    }
 
-    void FixedUpdate()
-    {
         if (grounded) HandleRotation();
         else HandleAirRotation(troubled);
 
@@ -285,7 +311,7 @@ public class PlayerInputSystem : MonoBehaviour
 
     private void HandleAcceleration()
     {
-        float forwardSpeed = Vector3.Dot(car.forward, rb.linearVelocity);
+        float forwardSpeed = Vector3.Dot(transform.forward, rb.linearVelocity);
         float desiredTorque = 0f;
 
         if (accelerateInput)
@@ -328,8 +354,8 @@ public class PlayerInputSystem : MonoBehaviour
 
     private void HandleJump()
     {
-        Vector3 forward = car.forward;
-        Vector3 up = car.up;
+        Vector3 forward = transform.forward;
+        Vector3 up = transform.up;
         up.Normalize();
         forward.Normalize();
 
@@ -360,7 +386,7 @@ public class PlayerInputSystem : MonoBehaviour
         if (lookInput != Vector2.zero)
         {
             // Input between -1 and 1 --> it's literally a percentage of maxCamYaw/Pitch
-            targetYaw = lookInput.x * maxCamYaw + (switchCam ? 180f : 0);
+            targetYaw = lookInput.x * maxCamYaw + (switchCamInput ? 180f : 0);
             targetPitch = defaultPitch + lookInput.y * maxCamPitch;
 
             targetPitch = Mathf.Clamp(targetPitch, minCamPitch, maxCamPitch + defaultPitch);
@@ -368,14 +394,14 @@ public class PlayerInputSystem : MonoBehaviour
         else
         {
             // Smoothly return to default
-            targetYaw = Mathf.Lerp(targetYaw, defaultYaw + (switchCam ? 180f : 0), sensitivity);
+            targetYaw = Mathf.Lerp(targetYaw, defaultYaw + (switchCamInput ? 180f : 0), sensitivity);
             targetPitch = Mathf.Lerp(targetPitch, defaultPitch, sensitivity);
 
             if (Mathf.Abs(targetYaw) < 0.01f) targetYaw = 0f;
             if (Mathf.Abs(targetPitch) < 0.01f) targetPitch = 0f;
         }
 
-        if (switchCam)
+        if (switchCamInput)
         {
             if (!camSwitched)
             {
@@ -415,7 +441,7 @@ public class PlayerInputSystem : MonoBehaviour
     // Methods
     private TorqueState GetTorqueState()
     {
-        float forwardSpeed = Vector3.Dot(car.forward, rb.linearVelocity);
+        float forwardSpeed = Vector3.Dot(transform.forward, rb.linearVelocity);
         if (forwardSpeed < 0f) return TorqueState.Rear;
         else if (Mathf.Abs(forwardSpeed) < 0.01f) return TorqueState.Stopped;
         else return TorqueState.Front;
@@ -425,21 +451,21 @@ public class PlayerInputSystem : MonoBehaviour
     {
         bool gr = false;
 
-        bool fr = Physics.Raycast(FRWheel.position, -car.up, groundedDistance);
-        bool fl = Physics.Raycast(FLWheel.position, -car.up, groundedDistance);
-        bool rr = Physics.Raycast(RRWheel.position, -car.up, groundedDistance);
-        bool rl = Physics.Raycast(RLWheel.position, -car.up, groundedDistance);
+        bool fr = Physics.Raycast(FRWheel.position, -transform.up, groundedDistance);
+        bool fl = Physics.Raycast(FLWheel.position, -transform.up, groundedDistance);
+        bool rr = Physics.Raycast(RRWheel.position, -transform.up, groundedDistance);
+        bool rl = Physics.Raycast(RLWheel.position, -transform.up, groundedDistance);
 
-        Debug.DrawRay(FRWheel.position, -car.up * groundedDistance, Color.red);
-        Debug.DrawRay(FLWheel.position, -car.up * groundedDistance, Color.red);
-        Debug.DrawRay(RRWheel.position, -car.up * groundedDistance, Color.red);
-        Debug.DrawRay(RLWheel.position, -car.up * groundedDistance, Color.red);
+        Debug.DrawRay(FRWheel.position, -transform.up * groundedDistance, Color.red);
+        Debug.DrawRay(FLWheel.position, -transform.up * groundedDistance, Color.red);
+        Debug.DrawRay(RRWheel.position, -transform.up * groundedDistance, Color.red);
+        Debug.DrawRay(RLWheel.position, -transform.up * groundedDistance, Color.red);
 
         if (fr && fl && rr && rl)
         {
             gr = true;
             // Maybe reset forces and rotation?
-            car.position.Normalize();
+            transform.position.Normalize();
         }
 
         return gr;
@@ -449,90 +475,90 @@ public class PlayerInputSystem : MonoBehaviour
     {
         bool troubled = false;
 
-        Debug.DrawRay(car.position, car.up * troubledUpDistance, Color.blue);
-        Debug.DrawRay(car.position, car.right * troubledSideDistance, Color.blue);
-        Debug.DrawRay(car.position, -car.right * troubledSideDistance, Color.blue);
+        Debug.DrawRay(transform.position, transform.up * troubledUpDistance, Color.blue);
+        Debug.DrawRay(transform.position, transform.right * troubledSideDistance, Color.blue);
+        Debug.DrawRay(transform.position, -transform.right * troubledSideDistance, Color.blue);
 
-        if (Physics.Raycast(car.position, car.up, troubledUpDistance) ||
-            Physics.Raycast(car.position, car.right, troubledSideDistance) ||
-            Physics.Raycast(car.position, -car.right, troubledSideDistance))
+        if (Physics.Raycast(transform.position, transform.up, troubledUpDistance) ||
+            Physics.Raycast(transform.position, transform.right, troubledSideDistance) ||
+            Physics.Raycast(transform.position, -transform.right, troubledSideDistance))
             troubled = true;
 
         return troubled;
     }
 
     // Action Handlers
-    private void OnAccelerate(InputAction.CallbackContext ctx)
-    {
-        if (ctx.performed)
-        {
-            accelerateInput = true;
-        }
-        else if (ctx.canceled)
-        {
-            accelerateInput = false;
-        }
-    }
+    //private void OnAccelerate(InputAction.CallbackContext ctx)
+    //{
+    //    if (ctx.performed)
+    //    {
+    //        accelerateInput = true;
+    //    }
+    //    else if (ctx.canceled)
+    //    {
+    //        accelerateInput = false;
+    //    }
+    //}
 
-    private void OnDecelerate(InputAction.CallbackContext ctx)
-    {
-        if (ctx.performed)
-        {
-            decelerateInput = true;
-        }
-        else if (ctx.canceled)
-        {
-            decelerateInput = false;
-        }
-    }
+    //private void OnDecelerate(InputAction.CallbackContext ctx)
+    //{
+    //    if (ctx.performed)
+    //    {
+    //        decelerateInput = true;
+    //    }
+    //    else if (ctx.canceled)
+    //    {
+    //        decelerateInput = false;
+    //    }
+    //}
 
-    private void OnSteer(InputAction.CallbackContext ctx)
-    {
-        if (ctx.performed)
-        {
-            steerInput = ctx.ReadValue<Vector2>();
-        }
-        else if (ctx.canceled)
-        {
-            steerInput = Vector2.zero;
-        }
-    }
+    //private void OnSteer(InputAction.CallbackContext ctx)
+    //{
+    //    if (ctx.performed)
+    //    {
+    //        steerInput = ctx.ReadValue<Vector2>();
+    //    }
+    //    else if (ctx.canceled)
+    //    {
+    //        steerInput = Vector2.zero;
+    //    }
+    //}
 
-    private void OnJump(InputAction.CallbackContext ctx)
-    {
-        if (ctx.performed)
-        {
-            jumpInput = true;
-        }
-        if (ctx.canceled)
-        {
-            jumpInput = false;
-        }
-    }
+    //private void OnJump(InputAction.CallbackContext ctx)
+    //{
+    //    if (ctx.performed)
+    //    {
+    //        jumpInput = true;
+    //    }
+    //    if (ctx.canceled)
+    //    {
+    //        jumpInput = false;
+    //    }
+    //}
 
-    private void OnLook(InputAction.CallbackContext ctx)
-    {
-        if (ctx.performed)
-        {
-            lookInput = ctx.ReadValue<Vector2>();
-        }
-        else if (ctx.canceled)
-        {
-            lookInput = Vector2.zero;
-        }
-    }
+    //private void OnLook(InputAction.CallbackContext ctx)
+    //{
+    //    if (ctx.performed)
+    //    {
+    //        lookInput = ctx.ReadValue<Vector2>();
+    //    }
+    //    else if (ctx.canceled)
+    //    {
+    //        lookInput = Vector2.zero;
+    //    }
+    //}
 
-    private void OnSwitchCam(InputAction.CallbackContext ctx)
-    {
-        if (ctx.started || ctx.performed)
-        {
-            switchCam = true;
-            targetYaw += 180f;
-        }
-        else if (ctx.canceled)
-        {
-            switchCam = false;
-            targetYaw -= 180f;
-        }
-    }
+    //private void OnSwitchCam(InputAction.CallbackContext ctx)
+    //{
+    //    if (ctx.started || ctx.performed)
+    //    {
+    //        switchCamInput = true;
+    //        targetYaw += 180f;
+    //    }
+    //    else if (ctx.canceled)
+    //    {
+    //        switchCamInput = false;
+    //        targetYaw -= 180f;
+    //    }
+    //}
 }
