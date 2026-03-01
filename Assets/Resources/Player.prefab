@@ -483,7 +483,7 @@ GameObject:
   - component: {fileID: 7981790559343477441}
   m_Layer: 0
   m_Name: Player
-  m_TagString: Untagged
+  m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -519,6 +519,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2df253be6ff395f4aa4456f3f941e862, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  defaultHealth: 100
+  _Health: 0
+  _Respawning: 0
 --- !u!114 &7115154535698430623
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -541,18 +544,19 @@ MonoBehaviour:
   RRCol: {fileID: 423610067274751756}
   controllerSensitivity: 5
   sensitivityMultiplier: 5
-  torqueState: 0
   maxTorque: 500
   minTorque: -500
   brakeForce: 5000
   torqueThreshold: 30
   maxSteerYaw: 15
+  maxAerialSteer: 30
+  maxAerialAngularVelocity: 1
   groundedDistance: 0.5
-  curTorque: 0
-  curBrake: 0
   troubledUpDistance: 1.5
   troubledSideDistance: 1.2
   jumpForce: 5000
+  jumping: 0
+  jumpCooldown: 0.2
   targetYaw: 0
   targetPitch: 0
   forwardStiffness: 1
@@ -582,6 +586,7 @@ MonoBehaviour:
   Flags: 262145
   NestedObjects: []
   NetworkedBehaviours:
+  - {fileID: 3088417710522864211}
   - {fileID: 7115154535698430623}
   - {fileID: 7981790559343477441}
   - {fileID: 4494062231700823564}

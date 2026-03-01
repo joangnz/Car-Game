@@ -1,6 +1,7 @@
 using Fusion;
 using Fusion.Sockets;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -17,17 +18,12 @@ public class GameManager : MonoBehaviour, INetworkRunnerCallbacks
     private InputAction accelerateAction, decelerateAction, steerAction, jumpAction, lookAction, switchCamAction;
     private bool accelerateInput = false, decelerateInput = false, jumpInput = false, switchCamInput = false;
     private Vector2 steerInput = Vector2.zero, lookInput = Vector2.zero;
+    private readonly Vector3 spawnPosition = new(30, 5, 30);
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    #region Initialization
     void Awake()
     {
         ActionsInit();
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
     }
 
     private void OnEnable()
@@ -49,7 +45,9 @@ public class GameManager : MonoBehaviour, INetworkRunnerCallbacks
         lookAction.Disable();
         switchCamAction.Disable();
     }
+    #endregion
 
+    #region Fusion Callbacks
     async void StartGame(GameMode mode)
     {
         // Create the Fusion runner and let it know that we will be providing user input
@@ -86,9 +84,8 @@ public class GameManager : MonoBehaviour, INetworkRunnerCallbacks
     public void OnPlayerJoined(NetworkRunner runner, PlayerRef player) {
         if (runner.IsServer)
         {
-            // Create a unique position for the player
-            Vector3 spawnPosition = new(30,5,30);
             NetworkObject networkPlayerObject = runner.Spawn(playerPrefab, spawnPosition, Quaternion.identity, player);
+            //networkPlayerObject.GetComponent<Player>().PlayerRef = player;
             // Keep track of the player avatars for easy access
             _spawnedCharacters.Add(player, networkPlayerObject);
         }
@@ -129,7 +126,9 @@ public class GameManager : MonoBehaviour, INetworkRunnerCallbacks
     public void OnObjectEnterAOI(NetworkRunner runner, NetworkObject obj, PlayerRef player) { }
     public void OnReliableDataReceived(NetworkRunner runner, PlayerRef player, ReliableKey key, ArraySegment<byte> data) { }
     public void OnReliableDataProgress(NetworkRunner runner, PlayerRef player, ReliableKey key, float progress) { }
+    #endregion
 
+    #region Actions
     private void ActionsInit()
     {
         accelerateAction = InputSystem.actions.FindAction("Accelerate");
@@ -229,6 +228,7 @@ public class GameManager : MonoBehaviour, INetworkRunnerCallbacks
             switchCamInput = false;
         }
     }
+    #endregion
 }
 
 public struct NetworkInputData : INetworkInput

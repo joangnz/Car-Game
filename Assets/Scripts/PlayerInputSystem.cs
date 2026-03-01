@@ -1,5 +1,5 @@
 using Fusion;
-using Fusion.Addons.Physics;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -24,47 +24,42 @@ public class Wheel
 
 public class PlayerInputSystem : NetworkBehaviour
 {
-    // Components and Children
     [Header("Components and Children")]
     private Transform camPivot;
     private Rigidbody rb;
-    private NetworkRigidbody3D nrb;
     private Camera cam;
     [SerializeField] private Transform FLWheel, FRWheel, RLWheel, RRWheel;
     [SerializeField] private WheelCollider FLCol, FRCol, RLCol, RRCol;
 
-    // Actions
-    //private InputAction accelerateAction, decelerateAction, steerAction, jumpAction, lookAction, switchCamAction;
+    // Ground Layer
+    private LayerMask groundLayer;
 
-    // Action Inputs
     [Header("Sensitivity")]
     private bool accelerateInput, decelerateInput, jumpInput, switchCamInput = false;
     private Vector2 steerInput = Vector2.zero, lookInput = Vector2.zero;
     [SerializeField] private float controllerSensitivity = 5f;
     [SerializeField] private float sensitivityMultiplier = 5f;
 
-    // Attributes
     [Header("Car Attributes")]
     private bool grounded, troubled;
-    [SerializeField] private TorqueState torqueState = TorqueState.Front;
 
-    // Serialized Parameters
     [Header("Torque")]
-    //[SerializeField] private float curTorque = 0f;
     [SerializeField] private float maxTorque = 500f;
     [SerializeField] private float minTorque = -500f;
     [SerializeField] private float brakeForce = 15000f;
     [SerializeField] private float torqueThreshold = 30f;
     [SerializeField] private float maxSteerYaw = 30f;
+    [SerializeField] private float maxAerialSteer = 30f;
+    [SerializeField] private float maxAerialAngularVelocity = 1f;
     [SerializeField] private float groundedDistance = 0.5f;
-
-    [SerializeField] private float curTorque = 0f;
-    [SerializeField] private int curBrake = 0;
 
     [Header("Jump or Troubled")]
     [SerializeField] private float troubledUpDistance = 1.5f;
     [SerializeField] private float troubledSideDistance = 1.2f;
     [SerializeField] private float jumpForce = 10000f;
+    [SerializeField] private bool jumping = false;
+    [SerializeField] private float jumpCooldown = 0.2f;
+    private Coroutine jumpCoroutine = null;
 
     // Camera Parameters
     private readonly Vector3 camPos = new(0, 1, -10);
@@ -76,7 +71,6 @@ public class PlayerInputSystem : NetworkBehaviour
     public float targetYaw = 0f, targetPitch = 0f;
     private bool camSwitched = false;
 
-    // Wheels
     [Header("Wheels")]
     [SerializeField] private float forwardStiffness = 1f;
     [SerializeField] private float forwardES = 0;
@@ -95,8 +89,9 @@ public class PlayerInputSystem : NetworkBehaviour
     #region Initialization
     private void Awake()
     {
+        groundLayer = LayerMask.GetMask("Ground");
+
         rb = GetComponent<Rigidbody>();
-        nrb = GetComponent<NetworkRigidbody3D>();
 
         camPivot = transform.Find("CamPivot");
 
@@ -149,10 +144,8 @@ public class PlayerInputSystem : NetworkBehaviour
     #endregion
 
     #region Updates
-    public override void FixedUpdateNetwork()
+    public void HandleInput()
     {
-        torqueState = GetTorqueState();
-
         grounded = GetGrounded();
         if (!grounded) troubled = GetTroubled();
 
@@ -165,18 +158,14 @@ public class PlayerInputSystem : NetworkBehaviour
             jumpInput = input.jumpInput;
             lookInput = input.lookInput;
             switchCamInput = input.switchCamInput;
-            Debug.Log("Accelerate: " + accelerateInput);
-            Debug.Log("Decelerate: " + decelerateInput);
-            Debug.Log("Steer: " +  steerInput);
-            Debug.Log("Jump: " + jumpInput);
-            Debug.Log("Look: " + lookInput);
-            Debug.Log("Switch Cam: " +  switchCamInput);
         }
 
-        if (grounded) HandleRotation();
+        if (grounded)
+        {
+            HandleRotation();
+            HandleAcceleration();
+        }
         else HandleAirRotation(troubled);
-
-        HandleAcceleration();
 
         HandleJump();
         UpdateWheels();
@@ -232,12 +221,21 @@ public class PlayerInputSystem : NetworkBehaviour
 
     private void HandleAirRotation(bool troubled = false)
     {
-        float yaw = steerInput.x * maxSteerYaw;
-        float pitch = troubled ? 0 : steerInput.y * maxSteerYaw;
+        float yawInput = steerInput.x;
+        float pitchInput = troubled ? 0f : steerInput.y;
 
-        Vector3 v = new(pitch, yaw, 0);
-        Quaternion deltaRotation = Quaternion.Euler(v*Time.fixedDeltaTime);
-        rb.MoveRotation(rb.rotation * deltaRotation);
+        Vector3 torque = new(
+            -pitchInput * maxAerialSteer,
+            yawInput * maxAerialSteer,
+            0
+        );
+
+        rb.AddRelativeTorque(torque, ForceMode.Acceleration);
+
+        rb.angularVelocity = Vector3.ClampMagnitude(
+        rb.angularVelocity,
+        maxAerialAngularVelocity
+        );
     }
 
     private void HandleAcceleration()
@@ -264,8 +262,6 @@ public class PlayerInputSystem : NetworkBehaviour
             if (Mathf.Abs(wheel.Collider.motorTorque) < torqueThreshold &&
                 !(accelerateInput || decelerateInput)
                 ) wheel.Collider.motorTorque = 0;
-
-            curTorque = wheel.Collider.motorTorque;
         }
     }
 
@@ -273,29 +269,17 @@ public class PlayerInputSystem : NetworkBehaviour
     {
         if (b) RLCol.brakeTorque = RRCol.brakeTorque = FLCol.brakeTorque = FRCol.brakeTorque = brakeForce;
         else RLCol.brakeTorque = RRCol.brakeTorque = FLCol.brakeTorque = FRCol.brakeTorque = 0;
-
-        curBrake = b ? (int)brakeForce : 0;
-    }
-
-    private void HandleDrift(bool b)
-    {
-        if (b) RLCol.brakeTorque = RRCol.brakeTorque = FLCol.brakeTorque = FRCol.brakeTorque = brakeForce;
-        else RLCol.brakeTorque = RRCol.brakeTorque = FLCol.brakeTorque = FRCol.brakeTorque = 0;
     }
 
     private void HandleJump()
     {
-        Vector3 forward = transform.forward;
-        Vector3 up = transform.up;
-        up.Normalize();
-        forward.Normalize();
-
         if (jumpInput)
         {
             // if grounded jump
-            if (grounded)
+            if (grounded && !jumping)
             {
-                rb.AddForce(up * jumpForce, ForceMode.Impulse);
+                rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
+                jumpCoroutine ??= StartCoroutine(Jump());
             }
             else if (troubled)
             {
@@ -384,10 +368,10 @@ public class PlayerInputSystem : NetworkBehaviour
     {
         bool gr = false;
 
-        bool fr = Physics.Raycast(FRWheel.position, -transform.up, groundedDistance);
-        bool fl = Physics.Raycast(FLWheel.position, -transform.up, groundedDistance);
-        bool rr = Physics.Raycast(RRWheel.position, -transform.up, groundedDistance);
-        bool rl = Physics.Raycast(RLWheel.position, -transform.up, groundedDistance);
+        bool fr = Physics.Raycast(FRWheel.position, -transform.up, groundedDistance, groundLayer);
+        bool fl = Physics.Raycast(FLWheel.position, -transform.up, groundedDistance, groundLayer);
+        bool rr = Physics.Raycast(RRWheel.position, -transform.up, groundedDistance, groundLayer);
+        bool rl = Physics.Raycast(RLWheel.position, -transform.up, groundedDistance, groundLayer);
 
         Debug.DrawRay(FRWheel.position, -transform.up * groundedDistance, Color.red);
         Debug.DrawRay(FLWheel.position, -transform.up * groundedDistance, Color.red);
@@ -406,18 +390,30 @@ public class PlayerInputSystem : NetworkBehaviour
 
     private bool GetTroubled()
     {
+        if (jumping) return false;
+
         bool troubled = false;
 
         Debug.DrawRay(transform.position, transform.up * troubledUpDistance, Color.blue);
         Debug.DrawRay(transform.position, transform.right * troubledSideDistance, Color.blue);
         Debug.DrawRay(transform.position, -transform.right * troubledSideDistance, Color.blue);
 
-        if (Physics.Raycast(transform.position, transform.up, troubledUpDistance) ||
-            Physics.Raycast(transform.position, transform.right, troubledSideDistance) ||
-            Physics.Raycast(transform.position, -transform.right, troubledSideDistance))
+        if (Physics.Raycast(transform.position, transform.up, troubledUpDistance, groundLayer) ||
+            Physics.Raycast(transform.position, transform.right, troubledSideDistance, groundLayer) ||
+            Physics.Raycast(transform.position, -transform.right, troubledSideDistance, groundLayer))
             troubled = true;
 
         return troubled;
     }
     #endregion
+
+    private IEnumerator Jump()
+    {
+        jumping = true;
+        yield return new WaitForSeconds(jumpCooldown);
+        jumping = false;
+
+        StopCoroutine(jumpCoroutine);
+        jumpCoroutine = null;
+    }
 }
