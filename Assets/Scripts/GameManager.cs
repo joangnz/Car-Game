@@ -1,7 +1,6 @@
 using Fusion;
 using Fusion.Sockets;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -14,7 +13,7 @@ public class GameManager : MonoBehaviour, INetworkRunnerCallbacks
     private Dictionary<PlayerRef, NetworkObject> _spawnedCharacters = new();
 
     // Player
-    [SerializeField] GameObject playerPrefab;
+    [SerializeField] List<PlayerPrefab> playerPrefabs = new();
     private InputAction accelerateAction, decelerateAction, steerAction, jumpAction, lookAction, switchCamAction;
     private bool accelerateInput = false, decelerateInput = false, jumpInput = false, switchCamInput = false;
     private Vector2 steerInput = Vector2.zero, lookInput = Vector2.zero;
@@ -23,6 +22,12 @@ public class GameManager : MonoBehaviour, INetworkRunnerCallbacks
     #region Initialization
     void Awake()
     {
+        for (int i = playerPrefabs.Count - 1; i > 0; i--)
+        {
+            int j = UnityEngine.Random.Range(0, i + 1);
+            (playerPrefabs[i], playerPrefabs[j]) = (playerPrefabs[j], playerPrefabs[i]);
+        }
+        foreach (PlayerPrefab p in playerPrefabs) p.Taken = false;
         ActionsInit();
     }
 
@@ -84,8 +89,14 @@ public class GameManager : MonoBehaviour, INetworkRunnerCallbacks
     public void OnPlayerJoined(NetworkRunner runner, PlayerRef player) {
         if (runner.IsServer)
         {
-            NetworkObject networkPlayerObject = runner.Spawn(playerPrefab, spawnPosition, Quaternion.identity, player);
-            //networkPlayerObject.GetComponent<Player>().PlayerRef = player;
+            PlayerPrefab playerPrefab = null;
+            foreach (PlayerPrefab p in playerPrefabs) if (!p.Taken) playerPrefab = p;
+            if (playerPrefab == null) return;
+            playerPrefab.Taken = true;
+
+            NetworkObject networkPlayerObject = runner.Spawn( playerPrefab.Prefab, spawnPosition, Quaternion.identity, player);
+            networkPlayerObject.GetComponent<Player>().PlayerPrefab = playerPrefab;
+
             // Keep track of the player avatars for easy access
             _spawnedCharacters.Add(player, networkPlayerObject);
         }
@@ -93,6 +104,7 @@ public class GameManager : MonoBehaviour, INetworkRunnerCallbacks
     public void OnPlayerLeft(NetworkRunner runner, PlayerRef player) {
         if (_spawnedCharacters.TryGetValue(player, out NetworkObject networkObject))
         {
+            networkObject.GetComponent<Player>().PlayerPrefab.Taken = false;
             runner.Despawn(networkObject);
             _spawnedCharacters.Remove(player);
         }

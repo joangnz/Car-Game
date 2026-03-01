@@ -873,7 +873,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 92a215dd449d9004abc4e346e68310a0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  playerPrefab: {fileID: 2835036816586923637, guid: a7855f2457f32f944bae2b97c03abcec, type: 3}
+  playerPrefabs:
+  - {fileID: 11400000, guid: d8739eb4aed9f0f4cba7b19164911184, type: 2}
+  - {fileID: 11400000, guid: ed6a6fe15b4b59c4a8afeb0899c6f0f8, type: 2}
+  - {fileID: 11400000, guid: 7da0b4e03087dd343be52286986e46df, type: 2}
+  - {fileID: 11400000, guid: 637cb9b9c4f5be04fa7dd29a0e299653, type: 2}
+  - {fileID: 11400000, guid: a7fcf39d946c87846aefba89d011d62f, type: 2}
 --- !u!4 &1623358138
 Transform:
   m_ObjectHideFlags: 0

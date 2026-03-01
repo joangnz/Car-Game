@@ -1,6 +1,7 @@
 using Fusion;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public enum TorqueState
@@ -279,8 +280,8 @@ public class PlayerInputSystem : NetworkBehaviour
             }
             else if (troubled)
             {
-                Quaternion desiredRot = Quaternion.Lerp(rb.rotation, Quaternion.Euler(0, 0, 0), 0.1f);
-                rb.MoveRotation(desiredRot);
+                Debug.Log("Untroubling");
+                rb.MoveRotation(Quaternion.identity);
             }
         }
     }
@@ -399,6 +400,23 @@ public class PlayerInputSystem : NetworkBehaviour
             Physics.Raycast(transform.position, -transform.right, troubledSideDistance, groundLayer))
             troubled = true;
 
+        Vector3 frontPos, rearPos;
+        frontPos = new(
+            FrontWheels.Average(w => w.Transform.position.x),
+            FrontWheels.Average(w => w.Transform.position.y),
+            FrontWheels.Average(w => w.Transform.position.z)
+            );
+        rearPos = new(
+            RearWheels.Average(w => w.Transform.position.x),
+            RearWheels.Average(w => w.Transform.position.y),
+            RearWheels.Average(w => w.Transform.position.z)
+            );
+
+        if (Physics.Raycast(frontPos, Vector3.down, groundedDistance, groundLayer) !|
+            Physics.Raycast(rearPos, Vector3.down, groundedDistance, groundLayer))
+            troubled = true;
+
+        Debug.Log(troubled);
         return troubled;
     }
     #endregion

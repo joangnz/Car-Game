@@ -9,6 +9,7 @@ public class Player : NetworkBehaviour
     private Canvas canvas;
     private PlayerInputSystem pis;
     private readonly List<GameObject> playerObjects = new();
+    public PlayerPrefab PlayerPrefab { get; set; }
 
     public float defaultHealth = 200;
     private readonly short magnitudeMultiplier = 3;
