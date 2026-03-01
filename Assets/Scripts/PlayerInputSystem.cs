@@ -44,22 +44,22 @@ public class PlayerInputSystem : NetworkBehaviour
     private bool grounded, troubled;
 
     [Header("Torque")]
-    private readonly float maxTorque = 500f;
-    private readonly float minTorque = -500f;
-    private readonly float brakeForce = 15000f;
-    private readonly float torqueThreshold = 30f;
-    private readonly float maxSteerYaw = 30f;
-    private readonly float aerialTorqueMultiplier = 3000f;
-    private readonly float maxAerialAngularVelocity = 1f;
+    private readonly float maxTorque = 500;
+    private readonly float minTorque = -500;
+    private readonly float brakeForce = 5000;
+    private readonly float torqueThreshold = 30;
+    private readonly float maxSteerYaw = 15;
+    private readonly float aerialTorqueMultiplier = 3000;
+    private readonly float maxAerialAngularVelocity = 1;
     private readonly float groundedDistance = 0.5f;
 
     [Header("Jump or Troubled")]
     private readonly float troubledUpDistance = 1.5f;
     private readonly float troubledSideDistance = 1.2f;
-    private readonly float jumpForce = 10000f;
-    private bool jumping = false;
+    private readonly float jumpForce = 2750;
     private readonly float jumpCooldown = 0.2f;
     private Coroutine jumpCoroutine = null;
+    private bool jumping = false;
 
     // Camera Parameters
     private readonly Vector3 camPos = new(0, 1, -10);
@@ -72,16 +72,16 @@ public class PlayerInputSystem : NetworkBehaviour
     private bool camSwitched = false;
 
     [Header("Wheels")]
-    private readonly float forwardStiffness = 1f;
-    private readonly float forwardES = 0;
-    private readonly float forwardEV = 1.2f;
-    private readonly float forwardAS = .5f;
-    private readonly float forwardAV = .8f;
-    private readonly float sideStiffness = 1f;
-    private readonly float sideES = .3f;
-    private readonly float sideEV = 1.1f;
-    private readonly float sideAS = .6f;
-    private readonly float sideAV = .7f;
+    [SerializeField] private float forwardStiffness = 1;
+    [SerializeField] private float forwardES = 0.1f;
+    [SerializeField] private float forwardEV = 1.2f;
+    [SerializeField] private float forwardAS = .5f;
+    [SerializeField] private float forwardAV = .8f;
+    [SerializeField] private float sideStiffness = 1;
+    [SerializeField] private float sideES = 0.8f;
+    [SerializeField] private float sideEV = 1;
+    [SerializeField] private float sideAS = 1.2f;
+    [SerializeField] private float sideAV = 1.2f;
     private readonly List<Wheel> Wheels = new();
     private readonly List<Wheel> FrontWheels = new();
     private readonly List<Wheel> RearWheels = new();
@@ -151,7 +151,7 @@ public class PlayerInputSystem : NetworkBehaviour
 
         if (GetInput(out NetworkInputData input))
         {
-            if (switchCamInput != input.switchCamInput) targetYaw += switchCamInput ? 180 : -180;
+            if (switchCamInput != input.switchCamInput) targetYaw -= switchCamInput ? 180 : -180;
             accelerateInput = input.accelerateInput;
             decelerateInput = input.decelerateInput;
             steerInput = input.steerInput;
@@ -178,14 +178,30 @@ public class PlayerInputSystem : NetworkBehaviour
 
     private void UpdateWheels()
     {
-        foreach (Wheel wheel in Wheels)
-        {
-            UpdateWheelPose(wheel.Transform, wheel.Collider);
-        }
+        foreach (Wheel wheel in Wheels) UpdateWheelPose(wheel.Transform, wheel.Collider);
     }
 
     private void UpdateWheelPose(Transform tr, WheelCollider col)
     {
+        WheelFrictionCurve f = new()
+        {
+            extremumSlip = forwardES,
+            extremumValue = forwardEV,
+            asymptoteSlip = forwardAS,
+            asymptoteValue = forwardAV,
+            stiffness = forwardStiffness
+        }, s = new()
+        {
+            extremumSlip = sideES,
+            extremumValue = sideEV,
+            asymptoteSlip = sideAS,
+            asymptoteValue = sideAV,
+            stiffness = sideStiffness
+        };
+
+        col.forwardFriction = f;
+        col.sidewaysFriction = s;
+
         col.GetWorldPose(out Vector3 pos, out Quaternion rot);
         tr.SetPositionAndRotation(pos, rot);
     }
@@ -194,29 +210,9 @@ public class PlayerInputSystem : NetworkBehaviour
     #region Handlers
     private void HandleRotation()
     {
-        // When speed = 0, dont turn
-        float speed = rb.linearVelocity.magnitude;
-        if (speed < Mathf.Epsilon)
-            return;
+        float yaw = Mathf.Clamp(steerInput.x * maxSteerYaw, -maxSteerYaw, maxSteerYaw);
 
-        // Currently, yaw only takes the input and steers
-        float yaw = -steerInput.x * maxSteerYaw;
-
-        // If speed is really low, steer less. If speed is higher, steer more.
-        if (speed < 70) yaw *= speed;
-        // However, at higher speeds, steer less
-        else yaw *= 1.3f - speed;
-
-        // invert steering when reversing
-        if (speed < 0) yaw *= -1;
-
-        yaw = Mathf.Clamp(-yaw, -maxSteerYaw, maxSteerYaw);
-
-
-        foreach (Wheel wheel in FrontWheels)
-        {
-            wheel.Collider.steerAngle = Mathf.Lerp(wheel.Collider.steerAngle, yaw, .07f);
-        }
+        foreach (Wheel wheel in FrontWheels) wheel.Collider.steerAngle = Mathf.Lerp(wheel.Collider.steerAngle, yaw, .07f);
     }
 
     private void HandleAirRotation(bool troubled = false)

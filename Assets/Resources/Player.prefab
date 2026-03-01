@@ -542,21 +542,6 @@ MonoBehaviour:
   FRCol: {fileID: 5315002775921373118}
   RLCol: {fileID: 2371772589731301419}
   RRCol: {fileID: 423610067274751756}
-  controllerSensitivity: 5
-  sensitivityMultiplier: 5
-  maxTorque: 500
-  minTorque: -500
-  brakeForce: 5000
-  torqueThreshold: 30
-  maxSteerYaw: 15
-  aerialTorqueMultiplier: 3000
-  maxAerialAngularVelocity: 1
-  groundedDistance: 0.5
-  troubledUpDistance: 1.5
-  troubledSideDistance: 1.2
-  jumpForce: 2750
-  jumping: 0
-  jumpCooldown: 0.2
   targetYaw: 0
   targetPitch: 0
   forwardStiffness: 1
@@ -565,7 +550,7 @@ MonoBehaviour:
   forwardAS: 0.5
   forwardAV: 0.8
   sideStiffness: 1
-  sideES: 0
+  sideES: 0.8
   sideEV: 1
   sideAS: 1.2
   sideAV: 1.2

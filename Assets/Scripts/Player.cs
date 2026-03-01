@@ -8,15 +8,19 @@ public class Player : NetworkBehaviour
 {
     private Canvas canvas;
     private PlayerInputSystem pis;
-    private List<GameObject> playerObjects = new();
+    private readonly List<GameObject> playerObjects = new();
 
-    public float defaultHealth = 100;
+    public float defaultHealth = 200;
+    private readonly short magnitudeMultiplier = 3;
 
     [Header("Network")]
     [Networked] public float Health { get; set; }
     [Networked] public bool Respawning { get; set; }
-    private readonly Vector3 spawnPosition = new(30, 5, 30);
 
+    private readonly Vector2[] spawnPositions = { new(30, 30), new(400, 100), new(250, 175), new(125, 190) };
+    private readonly float spawnHeight = 5;
+
+    #region Initialization
     private void Awake()
     {
         pis = GetComponent<PlayerInputSystem>();
@@ -34,7 +38,9 @@ public class Player : NetworkBehaviour
         Health = defaultHealth;
         Respawning = false;
     }
+    #endregion
 
+    #region Updates
     private void Update()
     {
         if (HasInputAuthority) canvas.gameObject.SetActive(Health == 0);
@@ -44,14 +50,18 @@ public class Player : NetworkBehaviour
     {
         if (Respawning && HasStateAuthority)
         {
+            Vector2 r = spawnPositions[Random.Range(0, spawnPositions.Length)];
+            Vector3 spawnPos = new(r.x, spawnHeight, r.y);
             NetworkRigidbody3D nrb = GetComponent<NetworkRigidbody3D>();
-            nrb.Teleport(spawnPosition, Quaternion.identity);
+            nrb.Teleport(spawnPos, Quaternion.identity);
             Respawning = false;
         }
 
         if (Health > 0) pis.HandleInput();
     }
+    #endregion
 
+    #region Player Collisions
     private void OnCollisionEnter(Collision collision)
     {
         if (!HasStateAuthority) return;
@@ -65,10 +75,11 @@ public class Player : NetworkBehaviour
 
     private void HandleCollision(Player player)
     {
-        if (player.GetComponent<Rigidbody>().linearVelocity.magnitude <
-            GetComponent<Rigidbody>().linearVelocity.magnitude)
+        float magnitude = GetComponent<Rigidbody>().linearVelocity.magnitude;
+        if (player.GetComponent<Rigidbody>().linearVelocity.magnitude < magnitude)
         {
-            player.Health = Mathf.Max(player.Health-30, 0);
+            Debug.Log(magnitude);
+            player.Health = Mathf.Max(player.Health-magnitude*magnitudeMultiplier, 0);
             Debug.Log(player.Health);
 
             if (player.Health <= 0) StartCoroutine(KillPlayer(player));
@@ -94,4 +105,5 @@ public class Player : NetworkBehaviour
     }
 
     private void ToggleBody(bool _) { foreach (GameObject g in playerObjects) g.SetActive(_); }
+    #endregion
 }
