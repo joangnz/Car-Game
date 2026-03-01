@@ -83,10 +83,7 @@ public class Player : NetworkBehaviour
     }
 
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-    private void RPC_DespawnPlayer(Player player)
-    {
-        player.ToggleBody(false);
-    }
+    private void RPC_DespawnPlayer(Player player) { player.ToggleBody(false); }
 
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RPC_RespawnPlayer(Player player)
@@ -96,8 +93,5 @@ public class Player : NetworkBehaviour
         player.Respawning = true;
     }
 
-    private void ToggleBody(bool _)
-    {
-        foreach (GameObject g in playerObjects) g.SetActive(_);
-    }
+    private void ToggleBody(bool _) { foreach (GameObject g in playerObjects) g.SetActive(_); }
 }

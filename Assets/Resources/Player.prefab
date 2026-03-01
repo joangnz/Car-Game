@@ -549,12 +549,12 @@ MonoBehaviour:
   brakeForce: 5000
   torqueThreshold: 30
   maxSteerYaw: 15
-  maxAerialSteer: 30
+  aerialTorqueMultiplier: 3000
   maxAerialAngularVelocity: 1
   groundedDistance: 0.5
   troubledUpDistance: 1.5
   troubledSideDistance: 1.2
-  jumpForce: 5000
+  jumpForce: 2750
   jumping: 0
   jumpCooldown: 0.2
   targetYaw: 0
@@ -608,9 +608,9 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2835036816586923637}
   serializedVersion: 5
-  m_Mass: 500
+  m_Mass: 200
   m_LinearDamping: 0
-  m_AngularDamping: 0.05
+  m_AngularDamping: 2
   m_CenterOfMass: {x: 0, y: -0.5, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}

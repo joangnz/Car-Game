@@ -37,28 +37,28 @@ public class PlayerInputSystem : NetworkBehaviour
     [Header("Sensitivity")]
     private bool accelerateInput, decelerateInput, jumpInput, switchCamInput = false;
     private Vector2 steerInput = Vector2.zero, lookInput = Vector2.zero;
-    [SerializeField] private float controllerSensitivity = 5f;
-    [SerializeField] private float sensitivityMultiplier = 5f;
+    private readonly float controllerSensitivity = 5f;
+    private readonly float sensitivityMultiplier = 5f;
 
     [Header("Car Attributes")]
     private bool grounded, troubled;
 
     [Header("Torque")]
-    [SerializeField] private float maxTorque = 500f;
-    [SerializeField] private float minTorque = -500f;
-    [SerializeField] private float brakeForce = 15000f;
-    [SerializeField] private float torqueThreshold = 30f;
-    [SerializeField] private float maxSteerYaw = 30f;
-    [SerializeField] private float maxAerialSteer = 30f;
-    [SerializeField] private float maxAerialAngularVelocity = 1f;
-    [SerializeField] private float groundedDistance = 0.5f;
+    private readonly float maxTorque = 500f;
+    private readonly float minTorque = -500f;
+    private readonly float brakeForce = 15000f;
+    private readonly float torqueThreshold = 30f;
+    private readonly float maxSteerYaw = 30f;
+    private readonly float aerialTorqueMultiplier = 3000f;
+    private readonly float maxAerialAngularVelocity = 1f;
+    private readonly float groundedDistance = 0.5f;
 
     [Header("Jump or Troubled")]
-    [SerializeField] private float troubledUpDistance = 1.5f;
-    [SerializeField] private float troubledSideDistance = 1.2f;
-    [SerializeField] private float jumpForce = 10000f;
-    [SerializeField] private bool jumping = false;
-    [SerializeField] private float jumpCooldown = 0.2f;
+    private readonly float troubledUpDistance = 1.5f;
+    private readonly float troubledSideDistance = 1.2f;
+    private readonly float jumpForce = 10000f;
+    private bool jumping = false;
+    private readonly float jumpCooldown = 0.2f;
     private Coroutine jumpCoroutine = null;
 
     // Camera Parameters
@@ -72,16 +72,16 @@ public class PlayerInputSystem : NetworkBehaviour
     private bool camSwitched = false;
 
     [Header("Wheels")]
-    [SerializeField] private float forwardStiffness = 1f;
-    [SerializeField] private float forwardES = 0;
-    [SerializeField] private float forwardEV = 1.2f;
-    [SerializeField] private float forwardAS = .5f;
-    [SerializeField] private float forwardAV = .8f;
-    [SerializeField] private float sideStiffness = 1f;
-    [SerializeField] private float sideES = .3f;
-    [SerializeField] private float sideEV = 1.1f;
-    [SerializeField] private float sideAS = .6f;
-    [SerializeField] private float sideAV = .7f;
+    private readonly float forwardStiffness = 1f;
+    private readonly float forwardES = 0;
+    private readonly float forwardEV = 1.2f;
+    private readonly float forwardAS = .5f;
+    private readonly float forwardAV = .8f;
+    private readonly float sideStiffness = 1f;
+    private readonly float sideES = .3f;
+    private readonly float sideEV = 1.1f;
+    private readonly float sideAS = .6f;
+    private readonly float sideAV = .7f;
     private readonly List<Wheel> Wheels = new();
     private readonly List<Wheel> FrontWheels = new();
     private readonly List<Wheel> RearWheels = new();
@@ -225,12 +225,12 @@ public class PlayerInputSystem : NetworkBehaviour
         float pitchInput = troubled ? 0f : steerInput.y;
 
         Vector3 torque = new(
-            -pitchInput * maxAerialSteer,
-            yawInput * maxAerialSteer,
+            -pitchInput * aerialTorqueMultiplier,
+            yawInput * aerialTorqueMultiplier,
             0
         );
 
-        rb.AddRelativeTorque(torque, ForceMode.Acceleration);
+        rb.AddRelativeTorque(torque, ForceMode.Force);
 
         rb.angularVelocity = Vector3.ClampMagnitude(
         rb.angularVelocity,
