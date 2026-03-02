@@ -3,12 +3,15 @@ using Fusion.Addons.Physics;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class Player : NetworkBehaviour
 {
-    private Canvas canvas;
+    private Canvas deadCanvas;
     private PlayerInputSystem pis;
     private readonly List<GameObject> playerObjects = new();
+
+    [SerializeField] private Image healthBar;
     public PlayerPrefab PlayerPrefab { get; set; }
 
     public float defaultHealth = 200;
@@ -25,7 +28,7 @@ public class Player : NetworkBehaviour
     private void Awake()
     {
         pis = GetComponent<PlayerInputSystem>();
-        canvas = FindFirstObjectByType<Canvas>(FindObjectsInactive.Include);
+        deadCanvas = FindFirstObjectByType<GameManager>().deadCanvas;
 
         foreach (Transform t in transform)
         {
@@ -44,7 +47,7 @@ public class Player : NetworkBehaviour
     #region Updates
     private void Update()
     {
-        if (HasInputAuthority) canvas.gameObject.SetActive(Health == 0);
+        if (HasInputAuthority) deadCanvas.gameObject.SetActive(Health == 0);
     }
 
     public override void FixedUpdateNetwork()
@@ -81,6 +84,8 @@ public class Player : NetworkBehaviour
         {
             Debug.Log(magnitude);
             player.Health = Mathf.Max(player.Health-magnitude*magnitudeMultiplier, 0);
+            player.ToggleHealthBar(true);
+            player.RPC_UpdateHealthBar();
             Debug.Log(player.Health);
 
             if (player.Health <= 0) StartCoroutine(KillPlayer(player));
@@ -95,16 +100,26 @@ public class Player : NetworkBehaviour
     }
 
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
-    private void RPC_DespawnPlayer(Player player) { player.ToggleBody(false); }
+    private void RPC_DespawnPlayer(Player player) {
+        player.ToggleBody(false);
+        player.ToggleHealthBar(false);
+    }
 
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
     private void RPC_RespawnPlayer(Player player)
     {
         player.ToggleBody(true);
         player.Health = defaultHealth;
+        player.RPC_UpdateHealthBar();
+        player.ToggleHealthBar(true);
         player.Respawning = true;
     }
 
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    public void RPC_UpdateHealthBar() { healthBar.fillAmount = Health / defaultHealth; }
+
     private void ToggleBody(bool _) { foreach (GameObject g in playerObjects) g.SetActive(_); }
+
+    public void ToggleHealthBar(bool _) { healthBar.gameObject.SetActive(_); }
     #endregion
 }

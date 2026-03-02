@@ -17,7 +17,10 @@ public class GameManager : MonoBehaviour, INetworkRunnerCallbacks
     private InputAction accelerateAction, decelerateAction, steerAction, jumpAction, lookAction, switchCamAction;
     private bool accelerateInput = false, decelerateInput = false, jumpInput = false, switchCamInput = false;
     private Vector2 steerInput = Vector2.zero, lookInput = Vector2.zero;
-    private readonly Vector3 spawnPosition = new(30, 5, 30);
+    private readonly Vector2[] spawnPositions = { new(30, 30), new(400, 100), new(250, 175), new(125, 190) };
+    private readonly short spawnHeight = 5;
+
+    public Canvas deadCanvas;
 
     #region Initialization
     void Awake()
@@ -94,7 +97,9 @@ public class GameManager : MonoBehaviour, INetworkRunnerCallbacks
             if (playerPrefab == null) return;
             playerPrefab.Taken = true;
 
-            NetworkObject networkPlayerObject = runner.Spawn( playerPrefab.Prefab, spawnPosition, Quaternion.identity, player);
+            Vector2 r = spawnPositions[UnityEngine.Random.Range(0, spawnPositions.Length)];
+            Vector3 spawnPos = new(r.x, spawnHeight, r.y);
+            NetworkObject networkPlayerObject = runner.Spawn( playerPrefab.Prefab, spawnPos, Quaternion.identity, player);
             networkPlayerObject.GetComponent<Player>().PlayerPrefab = playerPrefab;
 
             // Keep track of the player avatars for easy access
